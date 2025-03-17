@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sequencer Test</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    #sequencer-container {
+      width: 800px;
+      height: 600px;
+      border: 1px solid #ccc;
+      margin-top: 20px;
+    }
+    iframe {
+      width: 100%;
+      height: 100%;
+      border: none;
+    }
+    button {
+      margin: 10px;
+      padding: 8px 16px;
+      background-color: #4a90e2;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    button:hover {
+      background-color: #3a80d2;
+    }
+  </style>
+</head>
+<body>
+  <h1>Sequencer Test</h1>
+  <div>
+    <button id="load-btn">Load Test Data</button>
+  </div>
+  <div id="sequencer-container">
+    <iframe id="sequencer-iframe" src="index.html"></iframe>
+  </div>
+
+  <script>
+    // Test data in the requested format
+    const testData = {
+      notes: [
+        { x: 1, y: 1, instrument: 'coin' },
+        { x: 2, y: 4, instrument: 'coin' },
+        { x: 3, y: 10, instrument: 'coin' },
+        { x: 5, y: 6, instrument: 'coin' }
+      ],
+      tempo: 120
+    };
+
+    document.getElementById('load-btn').addEventListener('click', () => {
+      const iframe = document.getElementById('sequencer-iframe');
+      
+      // Wait for iframe to be ready
+      const checkReady = (event) => {
+        if (event.data && event.data.type === 'ready') {
+          console.log('Sequencer iframe is ready');
+          // Send the test data directly to the iframe
+          iframe.contentWindow.postMessage(testData, '*');
+        }
+      };
+      
+      window.addEventListener('message', checkReady);
+      
+      // If the iframe is already loaded, try sending the data
+      if (iframe.contentWindow) {
+        iframe.contentWindow.postMessage(testData, '*');
+      }
+    });
+  </script>
+</body>
+</html>

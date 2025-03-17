@@ -1,0 +1,124 @@
+/* Custom styles to make the sequencer fit better in the webview */
+
+/* Make the sequencer fill the available space */
+.sequencer {
+  width: 100% !important;
+  height: 100% !important;
+  box-sizing: border-box !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 0.5rem !important;
+  padding: 0.5rem !important;
+  max-width: 100% !important;
+}
+
+/* Adjust the sequencer header */
+.sequencer-header {
+  flex-shrink: 0 !important;
+  margin-bottom: 0.5rem !important;
+  gap: 0.5rem !important;
+  overflow: visible !important; /* Prevent scrollbars */
+}
+
+/* Make the grid container expand to fill available space */
+.grid-container {
+  flex: 1 !important;
+  overflow: auto !important;
+  width: 100% !important;
+  display: flex !important;
+  flex-direction: column !important;
+  overflow-x: auto !important;
+  max-width: 100% !important;
+}
+
+/* Make the grid expand to fill available space */
+.grid {
+  flex: 1 !important;
+  width: 100% !important;
+  overflow: auto !important;
+  gap: 1px !important;
+}
+
+/* Ensure controls stay at the bottom */
+.controls {
+  flex-shrink: 0 !important;
+  margin-top: 0.5rem !important;
+  padding: 0.5rem !important;
+  gap: 0.5rem !important;
+}
+
+/* Reduce padding in the root element */
+#root {
+  padding: 0.25rem !important;
+}
+
+/* Ensure the app container fills the space */
+.app {
+  width: 100% !important;
+  height: 100% !important;
+  padding: 0 !important;
+  display: flex !important;
+  align-items: stretch !important;
+  justify-content: center !important;
+}
+
+/* Make buttons more compact */
+.button {
+  padding: 0.25rem 0.5rem !important;
+  font-size: 12px !important;
+}
+
+/* Adjust font sizes */
+h1, h2, h3 {
+  font-size: 1.2em !important;
+  margin: 0.25rem 0 !important;
+}
+
+/* Make the tempo display smaller */
+.tempo-display {
+  font-size: 12px !important;
+}
+
+/* Reduce the size of the grid cells */
+.grid-cell {
+  width: 25px !important;
+  height: 25px !important;
+}
+
+/* Make instrument buttons smaller */
+.instrument-button {
+  width: 30px !important;
+  height: 30px !important;
+  padding: 2px !important;
+}
+
+/* Make the instrument palette more compact */
+.instrument-palette {
+  padding: 0.25rem !important;
+  gap: 0.25rem !important;
+  overflow: visible !important; /* Remove scrollbar */
+  flex-wrap: wrap !important; /* Allow wrapping to prevent overflow */
+  justify-content: center !important; /* Center the buttons */
+  max-width: 100% !important;
+  overflow-x: hidden !important; /* Explicitly hide horizontal scrollbar */
+}
+
+/* Make the preview window smaller */
+.preview-window {
+  min-height: 40px !important;
+  padding: 0.25rem !important;
+}
+
+/* Remove all scrollbars from header elements */
+.sequencer-header > * {
+  overflow: visible !important;
+  overflow-x: hidden !important;
+  max-width: 100% !important;
+}
+
+/* Target specific elements that might have scrollbars */
+.selected-instrument, .instrument-label, .instrument-preview {
+  overflow: hidden !important;
+  white-space: nowrap !important;
+  text-overflow: ellipsis !important;
+}

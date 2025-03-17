@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reddit MIDI Sequencer</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.7.77/Tone.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background-color: #1a1a1a;
+            color: white;
+        }
+
+        #app {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .theme-banner {
+            background-color: #2a2a2a;
+            padding: 16px;
+            border-radius: 8px;
+            margin-bottom: 24px;
+            text-align: center;
+        }
+
+        .theme-banner h1 {
+            margin: 0;
+            color: #4CAF50;
+        }
+
+        .theme-banner p {
+            margin: 8px 0 0;
+            opacity: 0.8;
+        }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <div class="theme-banner">
+            <h1>Loading theme...</h1>
+            <p>Create your musical masterpiece!</p>
+        </div>
+        <div id="sequencer-root"></div>
+    </div>
+
+    <script type="module">
+        // Initialize Tone.js
+        await Tone.start();
+        const synth = new Tone.PolySynth().toDestination();
+
+        // Set up communication with Reddit
+        window.addEventListener('message', async (event) => {
+            const { data } = event;
+            
+            if (data.type === 'init') {
+                // Initialize the sequencer with data from Reddit
+                const { composition, theme } = data;
+                if (theme) {
+                    document.querySelector('.theme-banner h1').textContent = theme.name;
+                    document.querySelector('.theme-banner p').textContent = theme.description;
+                }
+                
+                if (composition) {
+                    // TODO: Load composition data into the sequencer
+                }
+            }
+        });
+
+        // Function to send data back to Reddit
+        function sendToReddit(data) {
+            window.parent.postMessage(data, '*');
+        }
+
+        // Handle playback
+        let isPlaying = false;
+        const playButton = document.createElement('button');
+        playButton.textContent = 'Play';
+        playButton.onclick = async () => {
+            if (!isPlaying) {
+                await Tone.start();
+                Tone.Transport.start();
+                playButton.textContent = 'Stop';
+            } else {
+                Tone.Transport.stop();
+                playButton.textContent = 'Play';
+            }
+            isPlaying = !isPlaying;
+        };
+        document.getElementById('app').appendChild(playButton);
+
+        // Save composition
+        const saveButton = document.createElement('button');
+        saveButton.textContent = 'Save';
+        saveButton.onclick = () => {
+            const compositionData = {
+                // TODO: Gather composition data from the sequencer
+                tempo: 120,
+                instruments: []
+            };
+            
+            sendToReddit({
+                type: 'save',
+                data: compositionData
+            });
+        };
+        document.getElementById('app').appendChild(saveButton);
+    </script>
+</body>
+</html> 

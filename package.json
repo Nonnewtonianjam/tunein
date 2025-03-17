@@ -1,0 +1,23 @@
+{
+  "name": "tunein-sequencer",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "yarn build:devvit && yarn build:sequencer",
+    "build:devvit": "devvit build",
+    "build:sequencer": "cd sequencer && vite build",
+    "deploy": "devvit deploy"
+  },
+  "dependencies": {
+    "@devvit/public-api": "^0.11.10",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
+  },
+  "devDependencies": {
+    "@types/react": "^18.2.0",
+    "@types/react-dom": "^18.2.0",
+    "typescript": "^5.0.0",
+    "vite": "^5.0.0"
+  }
+}

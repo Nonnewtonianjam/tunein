@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>Music Sequencer</title>
+    <style>
+      html, body, #root {
+        width: 100%;
+        height: 100%;
+        margin: 0;
+        padding: 0;
+        overflow: hidden;
+      }
+      body {
+        background-color: #121212;
+      }
+      /* Remove scaling and make the sequencer fill the entire space */
+      #root {
+        width: 100%;
+        height: 100%;
+      }
+      /* Force the sequencer to take up full width and height */
+      .sequencer {
+        width: 100% !important;
+        height: 100% !important;
+        max-width: 100% !important;
+        max-height: 100% !important;
+        box-sizing: border-box !important;
+      }
+      /* Make the grid take up available space */
+      .grid-container {
+        flex: 1 !important;
+        overflow: auto !important;
+        width: 100% !important;
+      }
+      /* Ensure the app container fills the space */
+      .app {
+        width: 100% !important;
+        height: 100% !important;
+        padding: 0 !important;
+      }
+    </style>
+    <script type="module" crossorigin src="/assets/main--nLuM0F4.js"></script>
+    <link rel="stylesheet" crossorigin href="/assets/main-y9rBKH0N.css">
+    <link rel="stylesheet" href="/custom-sequencer.css">
+  </head>
+  <body>
+    <div id="root"></div>
+  </body>
+</html>
