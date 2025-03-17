@@ -19,8 +19,10 @@ const testData = {
 export function TestSequencer() {
   console.log('Rendering TestSequencer with hardcoded data:', testData);
   
-  const handleSave = (notes: Note[]) => {
-    console.log('Save called with notes:', notes);
+  const handleSave = (composition: { notes: Note[], tempo: number }) => {
+    console.log('Save called with composition:', composition);
+    // In a real app, we would save this to a database or send it to a server
+    alert(`Saved ${composition.notes.length} notes with tempo ${composition.tempo}`);
   };
 
   return (

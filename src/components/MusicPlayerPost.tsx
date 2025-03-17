@@ -39,7 +39,7 @@ export const MusicPlayerPost = (context: Context) => {
             
             postMessage({
               type: 'load',
-              data: formattedData
+              payload: formattedData
             });
           } else {
             console.error('No saved composition found for this post');

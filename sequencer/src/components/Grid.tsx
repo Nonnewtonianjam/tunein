@@ -32,23 +32,38 @@ export function Grid({
   // Debug notes array when it changes
   useEffect(() => {
     console.log('Grid received notes:', notes);
+    console.log('Grid notes length:', notes.length);
+    console.log('Grid notes array is array?', Array.isArray(notes));
+    
+    if (notes && Array.isArray(notes) && notes.length > 0) {
+      console.log('First note in grid:', notes[0]);
+      console.log('Sample note x:', notes[0].x);
+      console.log('Sample note y:', notes[0].y);
+      console.log('Sample note instrument:', notes[0].instrument);
+      
+      // Force a redraw of the canvas
+      const canvas = canvasRef.current;
+      if (canvas) {
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          drawGrid(ctx, canvas, notes);
+        }
+      }
+    } else {
+      console.warn('Grid has no notes to display');
+    }
   }, [notes]);
-
+  
   // Scroll to current beat when it changes
   useEffect(() => {
     if (containerRef.current && currentBeat >= 0) {
       const scrollPosition = currentBeat * GRID_CELL_SIZE;
       containerRef.current.scrollLeft = scrollPosition;
     }
-  }, [currentBeat]);
+  }, [currentBeat, GRID_CELL_SIZE]);
 
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
+  // Function to draw the grid and notes
+  const drawGrid = (ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement, currentNotes: Note[]) => {
     // Clear canvas
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
@@ -99,12 +114,15 @@ export function Grid({
     }
 
     // Log notes before drawing
-    console.log('Drawing notes on canvas:', notes);
+    console.log('Drawing notes on canvas:', currentNotes);
+    console.log('Canvas dimensions:', canvas.width, 'x', canvas.height);
     
     // Draw notes - make sure we're handling the array correctly
-    if (notes && Array.isArray(notes)) {
-      notes.forEach(note => {
+    if (currentNotes && Array.isArray(currentNotes)) {
+      console.log(`Attempting to draw ${currentNotes.length} notes`);
+      currentNotes.forEach((note, index) => {
         if (note && typeof note.x === 'number' && typeof note.y === 'number' && note.instrument) {
+          console.log(`Drawing note ${index} at position (${note.x}, ${note.y}) with instrument ${note.instrument}`);
           // Note background
           ctx.fillStyle = '#ffffff';  // White background for notes
           ctx.fillRect(
@@ -123,7 +141,7 @@ export function Grid({
             GRID_CELL_SIZE - 2,
             GRID_CELL_SIZE - 2
           );
-          
+
           // Note label
           ctx.fillStyle = note.instrument === selectedInstrument ? '#4a90e2' : '#666666';
           ctx.font = '10px monospace';
@@ -139,21 +157,15 @@ export function Grid({
         }
       });
     } else {
-      console.warn('Notes is not an array or is undefined:', notes);
+      console.warn('Notes is not an array or is undefined:', currentNotes);
     }
 
     // Draw playhead
     if (currentBeat >= 0 && currentBeat < maxBars) {
       ctx.fillStyle = 'rgba(255, 0, 0, 0.1)';  // Lighter red for playhead
-      ctx.fillRect(
-        (currentBeat - 1) * GRID_CELL_SIZE,
-        0,
-        GRID_CELL_SIZE,
-        GRID_ROWS * GRID_CELL_SIZE
-      );
+      ctx.fillRect(currentBeat * GRID_CELL_SIZE, 0, GRID_CELL_SIZE, GRID_ROWS * GRID_CELL_SIZE);
       
-      // Add playhead line
-      ctx.strokeStyle = '#ff6b6b';  // Softer red for playhead
+      ctx.strokeStyle = '#ff0000';  // Red for playhead line
       ctx.lineWidth = 2;
       ctx.beginPath();
       ctx.moveTo((currentBeat - 1) * GRID_CELL_SIZE, 0);
@@ -172,6 +184,23 @@ export function Grid({
         GRID_CELL_SIZE
       );
     }
+  };
+
+  // Main render effect
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    // Ensure canvas dimensions are set correctly
+    canvas.width = maxBars * GRID_CELL_SIZE;
+    canvas.height = GRID_ROWS * GRID_CELL_SIZE;
+    console.log(`Canvas dimensions set to ${canvas.width}x${canvas.height}`);
+
+    // Draw the grid and notes
+    drawGrid(ctx, canvas, notes);
   }, [notes, maxBars, currentBeat, selectedInstrument, hoverPosition, beatsPerMeasure]);
 
   const getGridPosition = (e: React.MouseEvent | React.DragEvent) => {
@@ -266,6 +295,22 @@ export function Grid({
         borderRadius: '4px'
       }}
     >
+      {/* Debug info */}
+      <div style={{
+        position: 'absolute',
+        top: '5px',
+        left: '5px',
+        background: 'rgba(0,0,0,0.7)',
+        color: 'white',
+        padding: '3px',
+        fontSize: '10px',
+        zIndex: 100,
+        pointerEvents: 'none',
+        borderRadius: '3px'
+      }}>
+        Notes: {notes.length}
+      </div>
+      
       <canvas
         ref={canvasRef}
         width={maxBars * GRID_CELL_SIZE}

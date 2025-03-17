@@ -42,7 +42,7 @@ export interface SequencerState {
 }
 
 export interface SequencerProps {
-  onSave?: (notes: Note[]) => void;
+  onSave?: (composition: { notes: Note[], tempo: number }) => void;
   initialNotes?: Note[];
   initialTempo?: number;
   maxBars?: number;

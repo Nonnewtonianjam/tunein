@@ -101,12 +101,28 @@ export class CompositionService {
       const post = await this.context.reddit.submitPost({
         title: `🎵 ${name}`,
         subredditName: subreddit.name,
-        preview: (
-          <vstack padding="medium" alignment="middle center">
-            <text size="xlarge">🎵 {name}</text>
-            <text>Loading your saved music sequencer...</text>
-          </vstack>
-        )
+        preview: {
+          type: 'vstack',
+          props: {
+            padding: 'medium',
+            alignment: 'middle center',
+            children: [
+              {
+                type: 'text',
+                props: {
+                  size: 'xlarge',
+                  children: `🎵 ${name}`
+                }
+              },
+              {
+                type: 'text',
+                props: {
+                  children: 'Loading your saved music sequencer...'
+                }
+              }
+            ]
+          }
+        }
       });
 
       // Save the composition data to Redis with the new post ID as key

@@ -2,6 +2,7 @@ import { Context } from '@devvit/public-api';
 import { CompositionService } from '../services/compositionService';
 import { SequencerPost } from './SequencerPost';
 import { MusicPlayerPost } from './MusicPlayerPost';
+import { Devvit } from '@devvit/public-api';
 
 /**
  * Universal post handler that determines which component to render based on Redis data

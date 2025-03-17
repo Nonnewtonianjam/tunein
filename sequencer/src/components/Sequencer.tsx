@@ -53,6 +53,7 @@ export function Sequencer({ onSave, initialNotes = [], initialTempo, maxBars }: 
       
       // Force a complete state update with the new notes
       setState(prev => {
+        console.log('Setting state with notes:', validNotes);
         return {
           ...prev,
           notes: [...validNotes], // Create a new array to ensure React detects the change
@@ -61,12 +62,36 @@ export function Sequencer({ onSave, initialNotes = [], initialTempo, maxBars }: 
       });
       
       console.log('State updated with notes:', validNotes);
+      
+      // Force a re-render after a short delay to ensure the state has updated
+      setTimeout(() => {
+        console.log('Checking notes after timeout');
+        setState(prev => {
+          console.log('Current notes in state:', prev.notes);
+          if (prev.notes.length === 0 && validNotes.length > 0) {
+            console.log('Notes not set correctly, trying again');
+            return {
+              ...prev,
+              notes: [...validNotes]
+            };
+          }
+          return prev;
+        });
+      }, 100);
     }
   }, [initialNotes, initialTempo]);
 
   // Add a separate effect to log state changes
   useEffect(() => {
     console.log('Sequencer state updated:', state);
+    console.log('Sequencer notes in state:', state.notes);
+    console.log('Sequencer notes length:', state.notes.length);
+    
+    if (state.notes.length > 0) {
+      console.log('First note in sequencer state:', state.notes[0]);
+    } else {
+      console.warn('Sequencer state has no notes');
+    }
   }, [state]);
 
   const handleBeatChange = useCallback((beat: number) => {
@@ -198,7 +223,14 @@ export function Sequencer({ onSave, initialNotes = [], initialTempo, maxBars }: 
 
   const handleSave = () => {
     if (onSave) {
-      onSave(state.notes);
+      console.log('Saving composition with notes and tempo:', { 
+        notes: state.notes, 
+        tempo: state.tempo 
+      });
+      onSave({ 
+        notes: state.notes, 
+        tempo: state.tempo 
+      });
     }
   };
 
@@ -276,6 +308,34 @@ export function Sequencer({ onSave, initialNotes = [], initialTempo, maxBars }: 
           onNoteRemove={handleNoteRemove}
           beatsPerMeasure={state.beatsPerMeasure}
         />
+        {/* Debug display for notes */}
+        {process.env.NODE_ENV !== 'production' && (
+          <div style={{ 
+            position: 'absolute', 
+            bottom: '10px', 
+            right: '10px', 
+            background: 'rgba(0,0,0,0.7)', 
+            color: 'white', 
+            padding: '5px', 
+            borderRadius: '3px',
+            fontSize: '10px',
+            maxWidth: '300px',
+            overflow: 'auto',
+            maxHeight: '100px',
+            zIndex: 1000
+          }}>
+            Notes: {state.notes.length > 0 ? 
+              `${state.notes.length} notes` : 
+              'No notes'
+            }
+            {state.notes.length > 0 && (
+              <pre style={{ fontSize: '8px' }}>
+                {JSON.stringify(state.notes.slice(0, 3), null, 2)}
+                {state.notes.length > 3 && '...'}
+              </pre>
+            )}
+          </div>
+        )}
       </div>
       <div 
         data-testid="sequencer-state" 

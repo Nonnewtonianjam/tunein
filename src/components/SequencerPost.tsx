@@ -37,9 +37,20 @@ export const SequencerPost = (context: Context) => {
             
             console.log('Sending formatted data to sequencer:', formattedData);
             
+            // Make sure we're using the correct message format
             postMessage({
               type: 'load',
-              data: formattedData
+              payload: formattedData
+            });
+          } else {
+            console.log('No saved composition found, sending empty data');
+            // Send empty data to initialize the sequencer
+            postMessage({
+              type: 'load',
+              payload: {
+                notes: [],
+                tempo: 120
+              }
             });
           }
           break;
