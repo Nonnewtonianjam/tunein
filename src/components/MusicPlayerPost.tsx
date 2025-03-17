@@ -37,10 +37,25 @@ export const MusicPlayerPost = (context: Context) => {
             
             console.log('Sending formatted data to sequencer:', formattedData);
             
+            // Send in Devvit format
             postMessage({
-              type: 'load',
-              payload: formattedData
+              type: 'devvit-message',
+              data: {
+                message: {
+                  type: 'load',
+                  payload: formattedData
+                }
+              }
             });
+            
+            // Also try sending in the standard format after a short delay
+            setTimeout(() => {
+              console.log('Sending in standard format as fallback');
+              postMessage({
+                type: 'load',
+                payload: formattedData
+              });
+            }, 500);
           } else {
             console.error('No saved composition found for this post');
           }
@@ -48,6 +63,20 @@ export const MusicPlayerPost = (context: Context) => {
           
         case 'ready':
           console.log('Music player is ready');
+          
+          // When ready message is received, try sending the data again
+          const readySavedData = await compositionService.getSavedComposition(context.postId!);
+          if (readySavedData) {
+            console.log('Resending data after ready message:', readySavedData);
+            
+            postMessage({
+              type: 'load',
+              payload: {
+                notes: readySavedData.notes,
+                tempo: readySavedData.tempo
+              }
+            });
+          }
           break;
           
         case 'save':

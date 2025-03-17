@@ -28,6 +28,7 @@ export function Grid({
   const isDraggingRef = useRef(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const [hoverPosition, setHoverPosition] = useState<{ x: number; y: number } | null>(null);
+  const [fallbackVisible, setFallbackVisible] = useState<boolean>(false);
 
   // Debug notes array when it changes
   useEffect(() => {
@@ -203,6 +204,36 @@ export function Grid({
     drawGrid(ctx, canvas, notes);
   }, [notes, maxBars, currentBeat, selectedInstrument, hoverPosition, beatsPerMeasure]);
 
+  // Add a fallback rendering mechanism if canvas fails
+  useEffect(() => {
+    // Check if canvas is working properly
+    const canvas = canvasRef.current;
+    if (!canvas) {
+      console.warn('Canvas ref is null, cannot render grid');
+      return;
+    }
+    
+    const ctx = canvas.getContext('2d');
+    if (!ctx) {
+      console.warn('Could not get 2D context from canvas, using fallback rendering');
+      // Force the fallback DOM-based rendering to be visible
+      setFallbackVisible(true);
+      return;
+    }
+    
+    // Test drawing on canvas
+    try {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = '#f5f5f5';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      console.log('Canvas rendering test successful');
+    } catch (e) {
+      console.error('Canvas rendering test failed:', e);
+      // Force the fallback DOM-based rendering to be visible
+      setFallbackVisible(true);
+    }
+  }, []);
+
   const getGridPosition = (e: React.MouseEvent | React.DragEvent) => {
     const canvas = canvasRef.current;
     if (!canvas) return null;
@@ -295,22 +326,6 @@ export function Grid({
         borderRadius: '4px'
       }}
     >
-      {/* Debug info */}
-      <div style={{
-        position: 'absolute',
-        top: '5px',
-        left: '5px',
-        background: 'rgba(0,0,0,0.7)',
-        color: 'white',
-        padding: '3px',
-        fontSize: '10px',
-        zIndex: 100,
-        pointerEvents: 'none',
-        borderRadius: '3px'
-      }}>
-        Notes: {notes.length}
-      </div>
-      
       <canvas
         ref={canvasRef}
         width={maxBars * GRID_CELL_SIZE}
@@ -334,6 +349,49 @@ export function Grid({
           minWidth: '100%'
         }}
       />
+      
+      {/* Fallback note rendering using DOM elements - always show it */}
+      {notes && Array.isArray(notes) && notes.length > 0 && (
+        <div style={{ 
+          position: 'absolute', 
+          top: 0, 
+          left: 0, 
+          pointerEvents: 'none',
+          zIndex: 20 // Ensure it's above the canvas
+        }}>
+          {notes.map((note, index) => (
+            <div 
+              key={`note-${index}-${note.x}-${note.y}`}
+              style={{
+                position: 'absolute',
+                left: `${note.x * GRID_CELL_SIZE + 1}px`,
+                top: `${note.y * GRID_CELL_SIZE + 1}px`,
+                width: `${GRID_CELL_SIZE - 2}px`,
+                height: `${GRID_CELL_SIZE - 2}px`,
+                backgroundColor: 'rgba(255, 255, 255, 0.9)',
+                border: `2px solid ${note.instrument === selectedInstrument ? '#4a90e2' : '#999999'}`,
+                borderRadius: '2px',
+                zIndex: 10
+              }}
+            />
+          ))}
+        </div>
+      )}
+      
+      {/* Debug overlay */}
+      <div style={{ 
+        position: 'absolute', 
+        bottom: '5px', 
+        left: '5px', 
+        background: 'rgba(0,0,0,0.7)', 
+        color: 'white', 
+        padding: '5px', 
+        borderRadius: '3px',
+        fontSize: '10px',
+        zIndex: 100
+      }}>
+        Notes: {notes.length}
+      </div>
     </div>
   );
 } 

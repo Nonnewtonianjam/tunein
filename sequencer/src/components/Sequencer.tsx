@@ -77,6 +77,21 @@ export function Sequencer({ onSave, initialNotes = [], initialTempo, maxBars }: 
           }
           return prev;
         });
+        
+        // Send a confirmation message to the parent
+        try {
+          window.parent.postMessage({
+            type: 'devvit-message',
+            data: {
+              message: {
+                type: 'sequencerNotesUpdated',
+                count: validNotes.length
+              }
+            }
+          }, '*');
+        } catch (e) {
+          console.error('Error sending sequencerNotesUpdated message:', e);
+        }
       }, 100);
     }
   }, [initialNotes, initialTempo]);
@@ -235,118 +250,105 @@ export function Sequencer({ onSave, initialNotes = [], initialTempo, maxBars }: 
   };
 
   return (
-    <div className="sequencer" data-testid="sequencer">
-      <div className="sequencer-controls">
-        <button
-          className={`control-button ${state.isPlaying ? 'active' : ''}`}
-          onClick={state.isPlaying ? handleStop : handlePlay}
-        >
-          {state.isPlaying ? 'Pause' : 'Play'}
-        </button>
-        <button className="control-button" onClick={handleStop}>
-          Stop
-        </button>
-        <button className="control-button" onClick={handleClear}>
-          Clear
-        </button>
-        <button className="control-button" onClick={handleSave}>
-          Save
-        </button>
-        <div className="tempo-control">
-          <label>Tempo:</label>
-          <input
-            type="range"
-            min="60"
-            max="240"
-            value={state.tempo}
+    <div className="sequencer">
+      <div className="controls">
+        <div className="control-group">
+          <label>Tempo: {state.tempo} BPM</label>
+          <input 
+            type="range" 
+            min="60" 
+            max="240" 
+            value={state.tempo} 
             onChange={(e) => handleTempoChange(parseInt(e.target.value))}
           />
-          <span data-testid="tempo-display">{state.tempo}</span>
         </div>
-        <div className="loop-control">
-          <label>
-            <input
-              type="checkbox"
-              checked={state.isLooping}
-              onChange={handleLoopToggle}
-            />
-            Loop
-          </label>
-          {state.isLooping && (
-            <div className="loop-range">
-              <input
-                type="number"
-                min="1"
-                max={state.maxBars}
-                value={state.loopStart + 1}
-                onChange={(e) => handleLoopRangeChange(state.loopStart, parseInt(e.target.value) - 1)}
-              />
-              <span>to</span>
-              <input
-                type="number"
-                min="1"
-                max={state.maxBars}
-                value={state.loopEnd + 1}
-                onChange={(e) => handleLoopRangeChange(parseInt(e.target.value) - 1, state.loopEnd)}
-              />
-            </div>
-          )}
+        <div className="control-group">
+          <button 
+            className={state.isPlaying ? 'stop' : 'play'} 
+            onClick={state.isPlaying ? handleStop : handlePlay}
+          >
+            {state.isPlaying ? 'Stop' : 'Play'}
+          </button>
+          <button onClick={handleSave}>Save</button>
+        </div>
+        <div className="control-group instruments">
+          {Object.keys(INSTRUMENTS).map(instrument => (
+            <button
+              key={instrument}
+              className={`instrument ${state.selectedInstrument === instrument ? 'selected' : ''}`}
+              onClick={() => handleInstrumentSelect(instrument)}
+            >
+              {instrument}
+            </button>
+          ))}
         </div>
       </div>
-      <div className="sequencer-workspace">
-        <InstrumentPalette
-          selectedInstrument={state.selectedInstrument}
-          onSelect={handleInstrumentSelect}
-          onTimeSignatureChange={handleTimeSignatureChange}
-        />
-        <Grid
-          notes={state.notes}
-          maxBars={state.maxBars}
-          currentBeat={state.currentBeat}
-          selectedInstrument={state.selectedInstrument}
-          onNoteAdd={handleNoteAdd}
-          onNoteRemove={handleNoteRemove}
-          beatsPerMeasure={state.beatsPerMeasure}
-        />
-        {/* Debug display for notes */}
-        {process.env.NODE_ENV !== 'production' && (
-          <div style={{ 
-            position: 'absolute', 
-            bottom: '10px', 
-            right: '10px', 
-            background: 'rgba(0,0,0,0.7)', 
-            color: 'white', 
-            padding: '5px', 
-            borderRadius: '3px',
-            fontSize: '10px',
-            maxWidth: '300px',
-            overflow: 'auto',
-            maxHeight: '100px',
-            zIndex: 1000
-          }}>
-            Notes: {state.notes.length > 0 ? 
-              `${state.notes.length} notes` : 
-              'No notes'
-            }
-            {state.notes.length > 0 && (
-              <pre style={{ fontSize: '8px' }}>
-                {JSON.stringify(state.notes.slice(0, 3), null, 2)}
-                {state.notes.length > 3 && '...'}
-              </pre>
-            )}
-          </div>
-        )}
+      
+      <Grid 
+        notes={state.notes} 
+        maxBars={state.maxBars}
+        currentBeat={state.currentBeat}
+        selectedInstrument={state.selectedInstrument}
+        onNoteAdd={handleNoteAdd}
+        onNoteRemove={handleNoteRemove}
+        beatsPerMeasure={state.beatsPerMeasure}
+      />
+      
+      {/* Direct DOM-based rendering of notes as a backup */}
+      <div style={{ 
+        position: 'relative', 
+        width: '780px',
+        height: '300px',
+        marginTop: '10px',
+        background: '#f5f5f5',
+        border: '1px solid #ccc',
+        display: state.notes.length > 0 ? 'block' : 'none' // Show when notes exist
+      }}>
+        {state.notes.map((note, index) => (
+          <div 
+            key={`direct-note-${index}`}
+            style={{
+              position: 'absolute',
+              left: `${note.x * 30 + 1}px`,
+              top: `${note.y * 30 + 1}px`,
+              width: '28px',
+              height: '28px',
+              backgroundColor: 'rgba(255, 0, 0, 0.7)', // Red for visibility
+              border: '2px solid #4a90e2',
+              borderRadius: '2px'
+            }}
+          />
+        ))}
       </div>
-      <div 
-        data-testid="sequencer-state" 
-        style={{ display: 'none' }}
-      >
-        {JSON.stringify({
-          notes: state.notes,
-          tempo: state.tempo,
-          isPlaying: state.isPlaying,
-          currentBeat: state.currentBeat
-        })}
+      
+      {/* Debug display for notes */}
+      <div style={{ 
+        marginTop: '10px', 
+        padding: '10px', 
+        background: '#f0f0f0', 
+        border: '1px solid #ccc',
+        borderRadius: '4px',
+        fontSize: '12px',
+        display: 'block' // Always visible for debugging
+      }}>
+        <div>Notes count: {state.notes.length}</div>
+        <div>Current beat: {state.currentBeat}</div>
+        <div>Last updated: {new Date().toLocaleTimeString()}</div>
+        <button onClick={() => {
+          console.log('Current notes in state:', state.notes);
+          if (initialNotes && Array.isArray(initialNotes)) {
+            console.log('Initial notes:', initialNotes);
+            setState(prev => ({
+              ...prev,
+              notes: [...initialNotes]
+            }));
+          }
+        }}>
+          Force Update Notes
+        </button>
+        <pre style={{ maxHeight: '100px', overflow: 'auto' }}>
+          {JSON.stringify(state.notes, null, 2)}
+        </pre>
       </div>
     </div>
   );

@@ -37,19 +37,29 @@ export const SequencerPost = (context: Context) => {
             
             console.log('Sending formatted data to sequencer:', formattedData);
             
-            // Make sure we're using the correct message format
+            // Send in Devvit format
             postMessage({
-              type: 'load',
-              payload: formattedData
+              type: 'devvit-message',
+              data: {
+                message: {
+                  type: 'load',
+                  payload: formattedData
+                }
+              }
             });
           } else {
             console.log('No saved composition found, sending empty data');
-            // Send empty data to initialize the sequencer
+            // Send empty data to initialize the sequencer in Devvit format
             postMessage({
-              type: 'load',
-              payload: {
-                notes: [],
-                tempo: 120
+              type: 'devvit-message',
+              data: {
+                message: {
+                  type: 'load',
+                  payload: {
+                    notes: [],
+                    tempo: 120
+                  }
+                }
               }
             });
           }
@@ -61,28 +71,55 @@ export const SequencerPost = (context: Context) => {
           
         case 'save':
           try {
-            console.log('Saving composition:', msg.data);
-            console.log('Saving tempo:', (msg as any).tempo);
+            console.log('Saving composition:', msg);
             
             // Handle different data formats
             let notes = [];
             let tempo = 120; // Default tempo
             
-            // The data could be an array of notes directly or an object with notes property
-            if (Array.isArray(msg.data)) {
-              notes = msg.data;
-            } else if (msg.data && typeof msg.data === 'object' && Array.isArray(msg.data.notes)) {
-              notes = msg.data.notes;
-              
-              // If tempo is in the data object, use it
-              if (typeof msg.data.tempo === 'number') {
-                tempo = msg.data.tempo;
+            // Check if this is a Devvit-wrapped message
+            if (msg.type === 'devvit-message' && msg.data && msg.data.message) {
+              console.log('Processing Devvit-wrapped save message format');
+              const devvitMsg = msg.data.message;
+              if (devvitMsg.type === 'save') {
+                console.log('Processing standard save message format');
+                
+                // The data could be an array of notes directly or an object with notes property
+                if (Array.isArray(devvitMsg.payload)) {
+                  notes = devvitMsg.payload;
+                } else if (devvitMsg.payload && typeof devvitMsg.payload === 'object' && Array.isArray(devvitMsg.payload.notes)) {
+                  notes = devvitMsg.payload.notes;
+                  
+                  // If tempo is in the data object, use it
+                  if (typeof devvitMsg.payload.tempo === 'number') {
+                    tempo = devvitMsg.payload.tempo;
+                  }
+                }
+                
+                // Get tempo from the message or use the one from data object
+                if (typeof (devvitMsg as any).tempo === 'number') {
+                  tempo = (devvitMsg as any).tempo;
+                }
               }
-            }
-            
-            // Get tempo from the message or use the one from data object
-            if (typeof (msg as any).tempo === 'number') {
-              tempo = (msg as any).tempo;
+            } else if (msg.type === 'save' && msg.data) {
+              console.log('Processing standard save message format');
+              
+              // The data could be an array of notes directly or an object with notes property
+              if (Array.isArray(msg.data)) {
+                notes = msg.data;
+              } else if (msg.data && typeof msg.data === 'object' && Array.isArray(msg.data.notes)) {
+                notes = msg.data.notes;
+                
+                // If tempo is in the data object, use it
+                if (typeof msg.data.tempo === 'number') {
+                  tempo = msg.data.tempo;
+                }
+              }
+              
+              // Get tempo from the message or use the one from data object
+              if (typeof (msg as any).tempo === 'number') {
+                tempo = (msg as any).tempo;
+              }
             }
             
             console.log('Processed notes for saving:', notes);
