@@ -1,0 +1,653 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug Sequencer Notes</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            font-family: Arial, sans-serif;
+            background-color: #f5f5f5;
+        }
+        iframe {
+            border: 2px solid #333;
+            margin-top: 20px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+            width: 100%;
+            height: 600px;
+            max-width: 1000px;
+        }
+        .controls {
+            margin-bottom: 20px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        button {
+            padding: 10px 15px;
+            background-color: #4a90e2;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        button:hover {
+            background-color: #357abf;
+        }
+        .log-container {
+            margin-top: 20px;
+            border: 1px solid #ccc;
+            padding: 10px;
+            height: 200px;
+            overflow-y: auto;
+            background-color: #1e1e1e;
+            color: #f0f0f0;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+        }
+        .section {
+            margin-bottom: 30px;
+            padding: 15px;
+            background-color: white;
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        h1, h2 {
+            color: #333;
+        }
+        textarea {
+            width: 100%;
+            height: 150px;
+            font-family: monospace;
+            margin-bottom: 10px;
+            padding: 8px;
+        }
+        .success {
+            color: #4caf50;
+            font-weight: bold;
+        }
+        .error {
+            color: #f44336;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <h1>Sequencer Debug Tool</h1>
+    
+    <div class="section">
+        <h2>Custom Payload</h2>
+        <textarea id="notesPayload">
+{
+  "notes": [
+    { "x": 0, "y": 2, "instrument": "mario" },
+    { "x": 1, "y": 3, "instrument": "mario" },
+    { "x": 2, "y": 5, "instrument": "mario" },
+    { "x": 3, "y": 1, "instrument": "mario" },
+    { "x": 4, "y": 4, "instrument": "mario" }
+  ],
+  "tempo": 120
+}
+        </textarea>
+        <div class="controls">
+            <button id="sendNotes">Send Notes Directly</button>
+            <button id="sendDevvitNotes">Send Notes (Devvit Format)</button>
+            <button id="sendStandardNotes">Send Notes (Standard Format)</button>
+            <button id="getAllFormats">Send All Formats</button>
+            <button id="forceUpdate">Force Update</button>
+        </div>
+        
+        <h2>React State Inspector</h2>
+        <div class="controls">
+            <button id="inspectState">Inspect React State</button>
+            <button id="dispatchEvent">Dispatch Custom Event</button>
+            <button id="injectDirectRender">Insert Direct DOM Notes</button>
+        </div>
+    </div>
+    
+    <div class="section">
+        <h2>Sequencer Frame</h2>
+        <iframe 
+            id="sequencerFrame"
+            src="sequencer_built.html" 
+            title="Music Sequencer">
+        </iframe>
+    </div>
+    
+    <div class="section">
+        <h2>Communication Log</h2>
+        <button id="clearLog">Clear Log</button>
+        <div id="log" class="log-container"></div>
+    </div>
+
+    <script>
+        const frame = document.getElementById('sequencerFrame');
+        const notesPayload = document.getElementById('notesPayload');
+        const sendNotesBtn = document.getElementById('sendNotes');
+        const sendDevvitNotesBtn = document.getElementById('sendDevvitNotes');
+        const sendStandardNotesBtn = document.getElementById('sendStandardNotes');
+        const getAllFormatsBtn = document.getElementById('getAllFormats');
+        const forceUpdateBtn = document.getElementById('forceUpdate');
+        const inspectStateBtn = document.getElementById('inspectState');
+        const dispatchEventBtn = document.getElementById('dispatchEvent');
+        const injectDirectRenderBtn = document.getElementById('injectDirectRender');
+        const clearLogBtn = document.getElementById('clearLog');
+        const logContainer = document.getElementById('log');
+        
+        // Helper function to log messages
+        function log(message, type = 'info') {
+            const entry = document.createElement('div');
+            entry.className = type;
+            const time = new Date().toLocaleTimeString();
+            entry.innerHTML = `[${time}] ${message}`;
+            logContainer.appendChild(entry);
+            logContainer.scrollTop = logContainer.scrollHeight;
+        }
+        
+        // Parse JSON safely
+        function parseNotesPayload() {
+            try {
+                return JSON.parse(notesPayload.value);
+            } catch (e) {
+                log(`❌ JSON parsing error: ${e.message}`, 'error');
+                return null;
+            }
+        }
+        
+        // Wait for frame to load
+        frame.onload = function() {
+            log('Frame loaded, waiting 1 second before sending init message');
+            
+            // Wait a bit for frame to fully initialize
+            setTimeout(() => {
+                // Send multiple message formats to ensure one works
+                log('📤 Sending initialization messages to frame');
+                
+                frame.contentWindow.postMessage('ready', '*');
+                
+                frame.contentWindow.postMessage({
+                    type: 'INIT',
+                    payload: {
+                        ready: true
+                    }
+                }, '*');
+                
+                frame.contentWindow.postMessage({
+                    type: 'devvit-message',
+                    data: {
+                        message: {
+                            type: 'INIT',
+                            payload: {
+                                ready: true
+                            }
+                        }
+                    }
+                }, '*');
+            }, 1000);
+        };
+        
+        // Listen for messages from the frame
+        window.addEventListener('message', function(event) {
+            let messageText = typeof event.data === 'object' ? 
+                JSON.stringify(event.data, null, 2) : 
+                String(event.data);
+                
+            // Truncate very long messages
+            if (messageText.length > 500) {
+                messageText = messageText.substring(0, 500) + '... (truncated)';
+            }
+            
+            log(`🔄 From Frame: ${messageText}`);
+        });
+        
+        // Function to send notes to the sequencer frame
+        function sendNotes() {
+            const payload = parseNotesPayload();
+            if (!payload) return;
+            
+            const data = {
+              notes: payload.notes,
+              tempo: payload.tempo
+            };
+            
+            console.log('Sending data to sequencer:', data);
+            
+            // Send in multiple formats to ensure it's received
+            
+            // 1. Direct format
+            frame.contentWindow.postMessage(data, '*');
+            log('📤 Sent direct format');
+            
+            // 2. Wrapped in load type
+            frame.contentWindow.postMessage({
+              type: 'load',
+              payload: data
+            }, '*');
+            log('📤 Sent load type format');
+            
+            // 3. Wrapped in devvit-message format
+            frame.contentWindow.postMessage({
+              type: 'devvit-message',
+              data: {
+                message: {
+                  type: 'load',
+                  payload: data
+                }
+              }
+            }, '*');
+            log('📤 Sent devvit-message format');
+            
+            // 4. Use custom app-message event
+            try {
+              const appMessageEvent = new CustomEvent('app-message', {
+                detail: {
+                  type: 'load',
+                  payload: data
+                }
+              });
+              
+              // Dispatch to the sequencer's window
+              frame.contentWindow.dispatchEvent(appMessageEvent);
+              log('📤 Dispatched app-message event');
+            } catch (e) {
+              console.error('Error dispatching app-message event:', e);
+              log(`❌ Error dispatching app-message event: ${e.message}`, 'error');
+            }
+            
+            // Also try direct DOM rendering
+            setTimeout(() => {
+              try {
+                // Access the sequencer iframe's document
+                const sequencerDoc = frame.contentWindow.document;
+                
+                // Constants for rendering
+                const GRID_CELL_SIZE = 26;
+                
+                // Find or create container for direct notes
+                let container = sequencerDoc.getElementById('debug-direct-note-container');
+                if (container) {
+                  // Clear existing notes
+                  container.innerHTML = '';
+                } else {
+                  // Create new container
+                  container = sequencerDoc.createElement('div');
+                  container.id = 'debug-direct-note-container';
+                  container.style.position = 'absolute';
+                  container.style.top = '0';
+                  container.style.left = '0';
+                  container.style.width = '100%';
+                  container.style.height = '100%';
+                  container.style.pointerEvents = 'none';
+                  container.style.zIndex = '2000'; // Higher than other containers
+                }
+                
+                // Style the container
+                Object.assign(container.style, {
+                  position: 'absolute',
+                  top: '0',
+                  left: '0',
+                  width: '100%',
+                  height: '100%',
+                  pointerEvents: 'none',
+                  zIndex: '2000'
+                });
+                
+                // Create each note
+                payload.notes.forEach(note => {
+                  const noteEl = sequencerDoc.createElement('div');
+                  
+                  // Style the note
+                  Object.assign(noteEl.style, {
+                    position: 'absolute',
+                    left: `${note.x * GRID_CELL_SIZE + 1}px`,
+                    top: `${note.y * GRID_CELL_SIZE + 1}px`,
+                    width: `${GRID_CELL_SIZE - 2}px`,
+                    height: `${GRID_CELL_SIZE - 2}px`,
+                    backgroundColor: 'rgba(0, 255, 0, 0.8)', // Green for debug notes
+                    border: '2px solid #000',
+                    borderRadius: '2px',
+                    boxShadow: '0 0 5px rgba(0, 0, 0, 0.7)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: 'white',
+                    fontWeight: 'bold',
+                    fontSize: '12px',
+                    zIndex: '2001'
+                  });
+                  
+                  // Add label
+                  noteEl.textContent = note.instrument.charAt(0).toUpperCase();
+                  
+                  // Add to container
+                  container.appendChild(noteEl);
+                });
+                
+                // Find appropriate target in the sequencer's DOM
+                const targetElement = 
+                  sequencerDoc.querySelector('canvas') || 
+                  sequencerDoc.querySelector('.grid-container') || 
+                  sequencerDoc.querySelector('.sequencer') || 
+                  sequencerDoc.getElementById('root') || 
+                  sequencerDoc.body;
+                
+                // Add container to the target
+                if (targetElement) {
+                  targetElement.appendChild(container);
+                  log(`✅ Added ${payload.notes.length} debug notes directly to DOM`, 'success');
+                } else {
+                  log('❌ Could not find target element for direct DOM rendering', 'error');
+                }
+              } catch (e) {
+                console.error('Error with direct DOM rendering:', e);
+                log(`❌ Error with direct DOM rendering: ${e.message}`, 'error');
+              }
+            }, 1000);
+        }
+        
+        // Send notes directly button
+        sendNotesBtn.addEventListener('click', sendNotes);
+        
+        // Send notes in Devvit format
+        sendDevvitNotesBtn.addEventListener('click', function() {
+            const payload = parseNotesPayload();
+            if (!payload) return;
+            
+            // Create Devvit message structure
+            const message = {
+                type: 'devvit-message',
+                data: {
+                    message: {
+                        type: 'load',
+                        payload: payload
+                    }
+                }
+            };
+            
+            log('📤 Sending notes in Devvit format');
+            frame.contentWindow.postMessage(message, '*');
+        });
+        
+        // Send notes in standard format
+        sendStandardNotesBtn.addEventListener('click', function() {
+            const payload = parseNotesPayload();
+            if (!payload) return;
+            
+            // Create standard message structure
+            const message = {
+                type: 'load',
+                payload: payload
+            };
+            
+            log('📤 Sending notes in standard format');
+            frame.contentWindow.postMessage(message, '*');
+        });
+        
+        // Send notes in all formats
+        getAllFormatsBtn.addEventListener('click', function() {
+            const payload = parseNotesPayload();
+            if (!payload) return;
+            
+            log('📤 Sending notes in all formats sequentially');
+            
+            // Direct format
+            frame.contentWindow.postMessage(payload, '*');
+            
+            // Standard format with a delay
+            setTimeout(() => {
+                log('📤 Sending standard format');
+                frame.contentWindow.postMessage({
+                    type: 'load',
+                    payload: payload
+                }, '*');
+            }, 500);
+            
+            // Devvit format with a delay
+            setTimeout(() => {
+                log('📤 Sending Devvit format');
+                frame.contentWindow.postMessage({
+                    type: 'devvit-message',
+                    data: {
+                        message: {
+                            type: 'load',
+                            payload: payload
+                        }
+                    }
+                }, '*');
+            }, 1000);
+            
+            // Alternative format with a delay
+            setTimeout(() => {
+                log('📤 Sending alternative format');
+                frame.contentWindow.postMessage({
+                    type: 'load',
+                    data: payload
+                }, '*');
+            }, 1500);
+        });
+        
+        // Force update button
+        forceUpdateBtn.addEventListener('click', function() {
+            log('🔄 Sending force update message');
+            frame.contentWindow.postMessage({
+                type: 'forceUpdate',
+                timestamp: Date.now()
+            }, '*');
+            
+            // Also try to inject a script to force update React state
+            try {
+                frame.contentWindow.eval(`
+                    console.log('Executing force update script');
+                    // Dispatch a custom event that our app can listen for
+                    window.dispatchEvent(new CustomEvent('app-force-update', { 
+                        detail: { timestamp: ${Date.now()} } 
+                    }));
+                    
+                    // Try to trigger React state updates
+                    if (window.dispatchEvent) {
+                        console.log('Dispatching app-message event to force update');
+                        const notes = ${notesPayload.value};
+                        window.dispatchEvent(new CustomEvent('app-message', { 
+                            detail: { 
+                                type: 'load',
+                                payload: notes
+                            } 
+                        }));
+                    }
+                `);
+                log('✅ Force update script injected', 'success');
+            } catch (e) {
+                log(`❌ Failed to inject force update script: ${e.message}`, 'error');
+            }
+        });
+        
+        // Inspect React state
+        inspectStateBtn.addEventListener('click', function() {
+            log('🔍 Inspecting React state');
+            try {
+                frame.contentWindow.eval(`
+                    console.log('Inspecting React state');
+                    // Look for React dev tools
+                    if (window.__REACT_DEVTOOLS_GLOBAL_HOOK__) {
+                        console.log('React DevTools found');
+                        // Try to find our App component
+                        const fiberRoots = Array.from(window.__REACT_DEVTOOLS_GLOBAL_HOOK__.getFiberRoots(1));
+                        console.log('Fiber roots found:', fiberRoots.length);
+                        
+                        // Send a message to the parent with the state information
+                        window.parent.postMessage({
+                            type: 'reactInspection',
+                            hasDevTools: true,
+                            fiberRootsCount: fiberRoots.length
+                        }, '*');
+                    } else {
+                        console.log('React DevTools not found, using fallback approach');
+                        
+                        // Get state from all elements with data-reactroot
+                        const reactRoots = document.querySelectorAll('[data-reactroot]');
+                        console.log('React roots found in DOM:', reactRoots.length);
+                        
+                        // Send a message to the parent
+                        window.parent.postMessage({
+                            type: 'reactInspection',
+                            hasDevTools: false,
+                            domRootsCount: reactRoots.length
+                        }, '*');
+                    }
+                    
+                    // Direct check of App component state
+                    console.log('App and Sequencer component states:');
+                    const rootElement = document.getElementById('root');
+                    if (rootElement) {
+                        console.log('Root element found');
+                        // Log rendered notes directly from DOM
+                        const noteCells = document.querySelectorAll('[style*="position: absolute"]');
+                        console.log('Note cells found in DOM:', noteCells.length);
+                        window.parent.postMessage({
+                            type: 'domInspection',
+                            noteCellsCount: noteCells.length
+                        }, '*');
+                    } else {
+                        console.log('Root element not found');
+                    }
+                `);
+                log('✅ Inspection script executed', 'success');
+            } catch (e) {
+                log(`❌ Failed to inspect React state: ${e.message}`, 'error');
+            }
+        });
+        
+        // Dispatch custom event
+        dispatchEventBtn.addEventListener('click', function() {
+            log('📡 Dispatching custom event');
+            try {
+                const payload = parseNotesPayload();
+                if (!payload) return;
+                
+                frame.contentWindow.eval(`
+                    console.log('Dispatching custom event with notes');
+                    const notes = ${notesPayload.value};
+                    
+                    // Create and dispatch a custom event
+                    const event = new CustomEvent('app-message', { 
+                        detail: { 
+                            type: 'load',
+                            payload: notes
+                        } 
+                    });
+                    
+                    console.log('Dispatching event:', event);
+                    window.dispatchEvent(event);
+                    
+                    // Also try direct state update if we can access React components
+                    if (window.App && window.App.setNotes) {
+                        console.log('Found App component, directly setting notes');
+                        window.App.setNotes(notes.notes);
+                    }
+                `);
+                log('✅ Custom event dispatched', 'success');
+            } catch (e) {
+                log(`❌ Failed to dispatch event: ${e.message}`, 'error');
+            }
+        });
+        
+        // Inject direct DOM render
+        injectDirectRenderBtn.addEventListener('click', function() {
+            log('🖊️ Injecting direct DOM rendering');
+            try {
+                const payload = parseNotesPayload();
+                if (!payload) return;
+                
+                frame.contentWindow.eval(`
+                    console.log('Injecting direct DOM rendering');
+                    const notes = ${JSON.stringify(payload.notes)};
+                    
+                    // Create a direct DOM renderer
+                    function createNoteElement(note) {
+                        const GRID_CELL_SIZE = 26; // Same as in Grid.tsx
+                        
+                        const element = document.createElement('div');
+                        element.className = 'note-element';
+                        element.style.position = 'absolute';
+                        element.style.left = \`\${note.x * GRID_CELL_SIZE + 1}px\`;
+                        element.style.top = \`\${note.y * GRID_CELL_SIZE + 1}px\`;
+                        element.style.width = \`\${GRID_CELL_SIZE - 2}px\`;
+                        element.style.height = \`\${GRID_CELL_SIZE - 2}px\`;
+                        element.style.backgroundColor = 'rgba(255, 0, 0, 0.7)';
+                        element.style.border = '2px solid #999999';
+                        element.style.borderRadius = '2px';
+                        element.style.zIndex = '1000';
+                        element.style.boxShadow = '0 0 5px rgba(0,0,0,0.5)';
+                        
+                        // Add a label
+                        element.textContent = note.instrument.charAt(0).toUpperCase();
+                        element.style.display = 'flex';
+                        element.style.alignItems = 'center';
+                        element.style.justifyContent = 'center';
+                        element.style.color = 'white';
+                        element.style.fontFamily = 'monospace';
+                        element.style.fontSize = '10px';
+                        
+                        return element;
+                    }
+                    
+                    // Find the canvas container
+                    const canvas = document.querySelector('canvas');
+                    if (canvas) {
+                        console.log('Found canvas, injecting next to it');
+                        
+                        // Create a container for our notes
+                        const container = document.createElement('div');
+                        container.id = 'direct-notes-container';
+                        container.style.position = 'absolute';
+                        container.style.top = '0';
+                        container.style.left = '0';
+                        container.style.width = '100%';
+                        container.style.height = '100%';
+                        container.style.pointerEvents = 'none';
+                        container.style.zIndex = '900';
+                        
+                        // Remove existing container if any
+                        const existing = document.getElementById('direct-notes-container');
+                        if (existing) {
+                            existing.remove();
+                        }
+                        
+                        // Add all notes to the container
+                        notes.forEach(note => {
+                            container.appendChild(createNoteElement(note));
+                        });
+                        
+                        // Add the container next to the canvas
+                        canvas.parentNode.appendChild(container);
+                        
+                        console.log(\`Added \${notes.length} notes directly to DOM\`);
+                        window.parent.postMessage({
+                            type: 'directRenderingComplete',
+                            count: notes.length
+                        }, '*');
+                    } else {
+                        console.error('Could not find canvas element');
+                        window.parent.postMessage({
+                            type: 'directRenderingFailed',
+                            error: 'Canvas not found'
+                        }, '*');
+                    }
+                `);
+                log('✅ Direct DOM rendering injected', 'success');
+            } catch (e) {
+                log(`❌ Failed to inject DOM rendering: ${e.message}`, 'error');
+            }
+        });
+        
+        // Clear log button
+        clearLogBtn.addEventListener('click', function() {
+            logContainer.innerHTML = '';
+            log('Log cleared', 'success');
+        });
+    </script>
+</body>
+</html>

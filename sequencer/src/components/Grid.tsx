@@ -28,7 +28,6 @@ export function Grid({
   const isDraggingRef = useRef(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const [hoverPosition, setHoverPosition] = useState<{ x: number; y: number } | null>(null);
-  const [fallbackVisible, setFallbackVisible] = useState<boolean>(false);
 
   // Debug notes array when it changes
   useEffect(() => {
@@ -216,8 +215,6 @@ export function Grid({
     const ctx = canvas.getContext('2d');
     if (!ctx) {
       console.warn('Could not get 2D context from canvas, using fallback rendering');
-      // Force the fallback DOM-based rendering to be visible
-      setFallbackVisible(true);
       return;
     }
     
@@ -229,8 +226,6 @@ export function Grid({
       console.log('Canvas rendering test successful');
     } catch (e) {
       console.error('Canvas rendering test failed:', e);
-      // Force the fallback DOM-based rendering to be visible
-      setFallbackVisible(true);
     }
   }, []);
 
@@ -316,7 +311,7 @@ export function Grid({
       style={{
         width: '100%',
         maxWidth: '780px',
-        height: `${GRID_ROWS * GRID_CELL_SIZE + 10}px`,
+        height: `${GRID_ROWS * GRID_CELL_SIZE + 20}px`, // Increased from +10 to +20 to prevent cutoff
         overflowX: 'auto',
         overflowY: 'hidden',
         position: 'relative',
@@ -357,7 +352,10 @@ export function Grid({
           top: 0, 
           left: 0, 
           pointerEvents: 'none',
-          zIndex: 20 // Ensure it's above the canvas
+          zIndex: 100, // Ensure it's above everything else
+          width: '100%',
+          height: '100%',
+          backgroundColor: 'rgba(255, 255, 255, 0.1)' // Semi-transparent background to see it
         }}>
           {notes.map((note, index) => (
             <div 
@@ -368,10 +366,11 @@ export function Grid({
                 top: `${note.y * GRID_CELL_SIZE + 1}px`,
                 width: `${GRID_CELL_SIZE - 2}px`,
                 height: `${GRID_CELL_SIZE - 2}px`,
-                backgroundColor: 'rgba(255, 255, 255, 0.9)',
+                backgroundColor: 'rgba(255, 0, 0, 0.7)', // More visible red color
                 border: `2px solid ${note.instrument === selectedInstrument ? '#4a90e2' : '#999999'}`,
                 borderRadius: '2px',
-                zIndex: 10
+                zIndex: 110,
+                boxShadow: '0 0 5px rgba(0,0,0,0.5)' // Add shadow for visibility
               }}
             />
           ))}

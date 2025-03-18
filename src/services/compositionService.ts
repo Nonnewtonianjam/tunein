@@ -1,155 +1,134 @@
 import { Context } from '@devvit/public-api';
-import { Note, Composition, SavedComposition } from '../types';
+import { Note, Composition, SavedCompositionData, CompositionData } from '../types';
 
 /**
  * Service for handling composition data operations with Redis
  */
 export class CompositionService {
+  private static readonly COMPOSITION_KEY = 'composition';
+
   constructor(private context: Context) {}
 
   /**
-   * Get a saved composition from Redis
+   * Loads a composition from storage
    */
-  async getSavedComposition(postId: string): Promise<Composition | null> {
+  async load(postId: string): Promise<Composition | null> {
     try {
-      const data = await this.context.redis.get(`composition:${postId}`);
-      if (!data) return null;
-      
-      const savedData: SavedComposition = JSON.parse(data);
-      
-      // Handle different data formats
-      let notes: Note[] = [];
-      let tempo = 120; // Default tempo
-      
-      // Extract notes from various possible formats
-      if (Array.isArray(savedData.composition)) {
-        notes = this.validateNotes(savedData.composition);
-      } else if (savedData.composition && typeof savedData.composition === 'object') {
-        if (Array.isArray(savedData.composition.notes)) {
-          notes = this.validateNotes(savedData.composition.notes);
-          
-          // If tempo is in the composition object, use it
-          if (typeof savedData.composition.tempo === 'number') {
-            tempo = savedData.composition.tempo;
-          }
-        }
-      }
-      
-      // Get tempo from the top level if available
-      if (typeof savedData.tempo === 'number') {
-        tempo = savedData.tempo;
-      }
-      
-      console.log('Processed notes from Redis:', notes);
-      console.log('Processed tempo from Redis:', tempo);
-      
-      // Return in the standard format
-      return {
-        notes,
-        tempo,
-        name: savedData.name || 'My Music Composition',
-        createdAt: savedData.createdAt || new Date().toISOString(),
-        originalPostId: savedData.originalPostId,
-        isMusicPlayer: savedData.isMusicPlayer
+      const savedComposition = await this.context.kvStore.get<SavedCompositionData>(postId);
+      if (!savedComposition) return null;
+
+      const composition: Composition = {
+        tempo: savedComposition.composition?.tempo || 120,
+        instruments: [],
+        notes: savedComposition.composition?.notes || []
       };
-    } catch (error) {
-      console.error('Error getting saved composition:', error);
+
+      return composition;
+    } catch (e) {
+      console.error('Error loading composition:', e);
       return null;
     }
   }
 
   /**
-   * Save a composition to Redis
+   * Saves a composition to storage
    */
-  async saveComposition(
-    postId: string, 
-    notes: Note[], 
-    tempo: number, 
-    name: string = 'My Music Composition'
-  ): Promise<boolean> {
+  async save(postId: string, composition: Composition): Promise<boolean> {
     try {
-      const compositionKey = `composition:${postId}`;
-      await this.context.redis.set(
-        compositionKey,
-        JSON.stringify({
-          postId,
-          composition: notes,
-          tempo,
-          name,
-          createdAt: new Date().toISOString(),
-        })
-      );
+      const savedComposition: SavedCompositionData = {
+        postId,
+        composition: {
+          notes: composition.notes,
+          tempo: composition.tempo,
+          maxBars: 4 // Default maxBars
+        }
+      };
+
+      await this.context.kvStore.put(postId, savedComposition);
       return true;
-    } catch (error) {
-      console.error('Error saving composition:', error);
+    } catch (e) {
+      console.error('Error saving composition:', e);
       return false;
     }
   }
 
   /**
-   * Create a new post with the saved composition
+   * Loads a composition from storage and returns it
    */
-  async createMusicPlayerPost(
-    notes: Note[], 
-    tempo: number, 
-    name: string = 'My Music Composition',
-    originalPostId?: string
-  ): Promise<string | null> {
+  async loadComposition(): Promise<CompositionData | null> {
     try {
-      // Create a new post with the saved composition
-      const subreddit = await this.context.reddit.getCurrentSubreddit();
-      const post = await this.context.reddit.submitPost({
-        title: `🎵 ${name}`,
-        subredditName: subreddit.name,
-        preview: {
-          type: 'vstack',
-          props: {
-            padding: 'medium',
-            alignment: 'middle center',
-            children: [
-              {
-                type: 'text',
-                props: {
-                  size: 'xlarge',
-                  children: `🎵 ${name}`
-                }
-              },
-              {
-                type: 'text',
-                props: {
-                  children: 'Loading your saved music sequencer...'
-                }
-              }
-            ]
-          }
+      // Add extensive logging during load
+      console.log('Loading composition...');
+      
+      const data = await this.context.kvStore.get<CompositionData>(CompositionService.COMPOSITION_KEY);
+      
+      // Validate the composition data
+      if (data) {
+        console.log('Loaded composition from KV store:', data);
+        
+        // Make sure notes is present and valid
+        if (!data.notes || !Array.isArray(data.notes)) {
+          console.warn('Invalid composition data: notes array missing or invalid');
+          return this.createDefaultComposition();
         }
-      });
-
-      // Save the composition data to Redis with the new post ID as key
-      await this.context.redis.set(
-        `composition:${post.id}`,
-        JSON.stringify({
-          postId: post.id,
-          composition: notes,
-          tempo,
-          name,
-          createdAt: new Date().toISOString(),
-          originalPostId: originalPostId || this.context.postId,
-          isMusicPlayer: true, // Flag to identify this as a music player post
-        })
-      );
-
-      return post.id;
-    } catch (error) {
-      console.error('Error creating music player post:', error);
-      return null;
+        
+        // Validate each note in the array
+        const validNotes = data.notes.filter((note: Note) => 
+          note && 
+          typeof note === 'object' &&
+          typeof note.x === 'number' && 
+          typeof note.y === 'number' && 
+          typeof note.instrument === 'string'
+        );
+        
+        if (validNotes.length !== data.notes.length) {
+          console.warn(`Filtered out ${data.notes.length - validNotes.length} invalid notes`);
+          
+          // Update data to only include valid notes
+          data.notes = validNotes;
+        }
+        
+        // Deep clone to ensure we're not passing references
+        const safeData = JSON.parse(JSON.stringify(data)) as CompositionData;
+        console.log('Returning validated composition data:', safeData);
+        return safeData;
+      }
+      
+      console.log('No composition found, creating default');
+      return this.createDefaultComposition();
+    } catch (e) {
+      console.error('Error loading composition:', e);
+      return this.createDefaultComposition();
     }
+  }
+
+  /**
+   * Creates a default composition with a simple melody
+   */
+  private createDefaultComposition(): CompositionData {
+    console.log('Creating default composition');
+    
+    // Create a default composition with a simple melody
+    const defaultComposition: CompositionData = {
+      notes: [
+        { x: 0, y: 3, instrument: 'piano' },
+        { x: 2, y: 2, instrument: 'piano' },
+        { x: 4, y: 1, instrument: 'piano' },
+        { x: 6, y: 2, instrument: 'piano' },
+        { x: 8, y: 3, instrument: 'piano' },
+        { x: 10, y: 3, instrument: 'piano' },
+        { x: 12, y: 3, instrument: 'piano' }
+      ],
+      tempo: 120
+    };
+    
+    console.log('Created default composition:', defaultComposition);
+    return defaultComposition;
   }
 
   private validateNotes(notes: any[]): Note[] {
     return notes.filter((note: any) => 
       note && 
-      typeof note === 'object' &&
       typeof note.x === 'number' && 
       typeof note.y === 'number' && 
       typeof note.instrument === 'string'

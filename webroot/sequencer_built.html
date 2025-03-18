@@ -1,0 +1,287 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/assets/vite-4a748afd.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>Music Sequencer</title>
+    <style>
+      html, body, #root {
+        width: 100%;
+        height: 100%;
+        margin: 0;
+        padding: 0;
+        overflow: hidden;
+        visibility: visible !important;
+        display: block !important;
+        opacity: 1 !important;
+      }
+      body {
+        background-color: #ffffff;
+        color: #333333;
+        position: relative;
+      }
+      /* Remove scaling and make the sequencer fill the entire space */
+      #root {
+        width: 100% !important;
+        height: 100% !important;
+        visibility: visible !important;
+        display: block !important;
+        opacity: 1 !important;
+        position: absolute !important;
+        top: 0 !important;
+        left: 0 !important;
+        right: 0 !important;
+        bottom: 0 !important;
+        z-index: 1000 !important;
+      }
+      /* Force the sequencer to take up full width and height */
+      .sequencer {
+        width: 100% !important;
+        height: 100% !important;
+        max-width: 100% !important;
+        max-height: 100% !important;
+        box-sizing: border-box !important;
+        visibility: visible !important;
+        display: block !important;
+        opacity: 1 !important;
+        position: absolute !important;
+        top: 0 !important;
+        left: 0 !important;
+        right: 0 !important;
+        bottom: 0 !important;
+      }
+      /* Make the grid take up available space */
+      .grid-container {
+        flex: 1 !important;
+        overflow: auto !important;
+        width: 100% !important;
+        visibility: visible !important;
+        display: block !important;
+        opacity: 1 !important;
+      }
+      /* Ensure the app container fills the space */
+      .app {
+        width: 100% !important;
+        height: 100% !important;
+        padding: 0 !important;
+        visibility: visible !important;
+        display: block !important;
+        opacity: 1 !important;
+        position: absolute !important;
+        top: 0 !important;
+        left: 0 !important;
+        right: 0 !important;
+        bottom: 0 !important;
+      }
+    </style>
+    <link rel="stylesheet" href="/custom-sequencer.css">
+    <script type="module" crossorigin src="/assets/index-174dfdb7.js"></script>
+    <link rel="stylesheet" href="/assets/index-4ebde331.css">
+    <!-- Inject communication bridge script -->
+    <script>
+      // Make sure the window.parent is accessible
+      window.onload = function() {
+        console.log('Sequencer window loaded');
+        
+        // Create root if it doesn't exist
+        if (!document.getElementById('root')) {
+          console.error('Root element not found, creating one');
+          const rootDiv = document.createElement('div');
+          rootDiv.id = 'root';
+          document.body.appendChild(rootDiv);
+        }
+        
+        // Apply styles to ensure visibility
+        document.body.style.visibility = 'visible';
+        document.body.style.opacity = '1';
+        document.body.style.display = 'block';
+        
+        const rootElement = document.getElementById('root');
+        if (rootElement) {
+          rootElement.style.visibility = 'visible';
+          rootElement.style.opacity = '1';
+          rootElement.style.display = 'block';
+        }
+        
+        // Send immediate ready message
+        try {
+          console.log('Sending ready message from sequencer_built.html');
+          
+          // Send in multiple formats to ensure it's received
+          window.parent.postMessage('ready', '*');
+          
+          window.parent.postMessage({
+            type: 'ready',
+            timestamp: Date.now()
+          }, '*');
+          
+          window.parent.postMessage({
+            type: 'INIT',
+            payload: {
+              ready: true,
+              timestamp: Date.now()
+            }
+          }, '*');
+          
+          window.parent.postMessage({
+            type: 'devvit-message',
+            data: {
+              message: {
+                type: 'INIT',
+                payload: {
+                  ready: true,
+                  timestamp: Date.now()
+                }
+              }
+            }
+          }, '*');
+          
+          console.log('Ready messages sent to parent from sequencer_built.html');
+        } catch(e) {
+          console.error('Error sending ready message:', e);
+        }
+      };
+
+      // Set up a better message listener that will directly inject messages into our app
+      window.addEventListener('message', function(event) {
+        console.log('Sequencer_built.html received message:', event.data);
+        
+        // Inject message directly into our app event system
+        if (window.dispatchEvent) {
+          console.log('Dispatching app-message event');
+          window.dispatchEvent(new CustomEvent('app-message', { detail: event.data }));
+        }
+        
+        // If this is a load message with notes, log it prominently
+        if (event.data && (event.data.type === 'load' || 
+            (event.data.type === 'devvit-message' && 
+             event.data.data && 
+             event.data.data.message && 
+             event.data.data.message.type === 'load'))) {
+          console.log('%c LOAD MESSAGE RECEIVED ', 'background: #ff9900; color: white; font-size: 16px');
+          console.log(JSON.stringify(event.data, null, 2));
+        }
+      });
+      
+      // Add custom app-message event listener for direct communication
+      window.addEventListener('app-message', function(event) {
+        console.log('Received app-message event:', event.detail);
+        
+        // Process the message
+        try {
+          if (event.detail && event.detail.type === 'load' && event.detail.payload) {
+            console.log('Processing app-message load event:', event.detail.payload);
+            
+            // Attempt to access the main React component
+            // This will inject the notes directly into the DOM as a fallback
+            setTimeout(function() {
+              // Create direct DOM rendering if React isn't updating properly
+              const notes = event.detail.payload.notes;
+              if (notes && Array.isArray(notes) && notes.length > 0) {
+                console.log('Creating direct DOM rendering for', notes.length, 'notes');
+                
+                // Constants
+                const GRID_CELL_SIZE = 26;
+                
+                // Remove any existing direct renderings
+                const existingContainer = document.getElementById('direct-note-container');
+                if (existingContainer) {
+                  existingContainer.remove();
+                }
+                
+                // Create container
+                const container = document.createElement('div');
+                container.id = 'direct-note-container';
+                container.style.position = 'absolute';
+                container.style.top = '0';
+                container.style.left = '0';
+                container.style.width = '100%';
+                container.style.height = '100%';
+                container.style.pointerEvents = 'none';
+                container.style.zIndex = '1000';
+                
+                // Find a canvas element or any grid container
+                const canvas = document.querySelector('canvas');
+                const gridContainer = document.querySelector('.grid-container') || 
+                                     document.querySelector('.sequencer') || 
+                                     document.getElementById('root');
+                
+                if (!canvas && !gridContainer) {
+                  console.error('Could not find canvas or grid container');
+                  return;
+                }
+                
+                const targetElement = canvas || gridContainer;
+                
+                // Create notes
+                notes.forEach((note) => {
+                  const noteEl = document.createElement('div');
+                  noteEl.style.position = 'absolute';
+                  noteEl.style.left = `${note.x * GRID_CELL_SIZE + 1}px`;
+                  noteEl.style.top = `${note.y * GRID_CELL_SIZE + 1}px`;
+                  noteEl.style.width = `${GRID_CELL_SIZE - 2}px`;
+                  noteEl.style.height = `${GRID_CELL_SIZE - 2}px`;
+                  noteEl.style.backgroundColor = 'rgba(255, 0, 0, 0.8)'; // Brighter red for better visibility
+                  noteEl.style.border = '2px solid #000';
+                  noteEl.style.borderRadius = '2px';
+                  noteEl.style.boxShadow = '0 0 5px rgba(0, 0, 0, 0.7)';
+                  noteEl.style.zIndex = '1001';
+                  
+                  // Add text label
+                  noteEl.textContent = note.instrument.charAt(0).toUpperCase();
+                  noteEl.style.display = 'flex';
+                  noteEl.style.alignItems = 'center';
+                  noteEl.style.justifyContent = 'center';
+                  noteEl.style.color = 'white';
+                  noteEl.style.fontWeight = 'bold';
+                  noteEl.style.fontSize = '12px';
+                  
+                  container.appendChild(noteEl);
+                });
+                
+                // Add container to the target element
+                targetElement.parentNode.appendChild(container);
+                console.log(`Added ${notes.length} notes directly to DOM via app-message event`);
+              }
+            }, 500);
+          }
+        } catch (e) {
+          console.error('Error processing app-message event:', e);
+        }
+      });
+      
+      // Add a periodic check to ensure visibility and communication
+      setInterval(function() {
+        // Check document visibility
+        if (document.visibilityState === 'hidden' || 
+            document.body.style.visibility === 'hidden' || 
+            document.body.style.display === 'none') {
+          console.log('Document visibility issue detected, fixing...');
+          document.body.style.visibility = 'visible';
+          document.body.style.display = 'block';
+          document.body.style.opacity = '1';
+        }
+        
+        // Send heartbeat to parent
+        try {
+          window.parent.postMessage({
+            type: 'heartbeat',
+            timestamp: Date.now(),
+            location: 'sequencer_built.html'
+          }, '*');
+        } catch(e) {
+          console.error('Error sending heartbeat:', e);
+        }
+      }, 5000);
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <noscript>
+      <div style="color: red; background: white; padding: 20px; font-size: 24px; position: absolute; top: 0; left: 0; right: 0; bottom: 0; z-index: 9999;">
+        JavaScript is required to run this application.
+      </div>
+    </noscript>
+  </body>
+</html>

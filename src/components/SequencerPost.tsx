@@ -1,6 +1,7 @@
 import { Context, useWebView } from '@devvit/public-api';
 import { WebviewToBlockMessage, BlocksToWebviewMessage } from '../types';
 import { CompositionService } from '../services/compositionService';
+import { useEffect } from 'react';
 
 /**
  * Main sequencer post component
@@ -8,15 +9,111 @@ import { CompositionService } from '../services/compositionService';
 export const SequencerPost = (context: Context) => {
   const compositionService = new CompositionService(context);
 
+  useEffect(() => {
+    // Log when component mounts
+    console.log('SequencerPost mounted, ready for messages');
+    
+    // Set up debugging listeners if in browser environment
+    if (typeof globalThis !== 'undefined') {
+      try {
+        // Debug logging
+        (globalThis as any).addEventListener?.('devvit-storage-update', (event: any) => {
+          console.log('Devvit storage update:', event);
+        });
+        
+        // Debug logging for any errors
+        (globalThis as any).addEventListener?.('error', (event: any) => {
+          console.error('Global error caught in SequencerPost:', event.error);
+        });
+      } catch (e) {
+        console.error('Error setting up debug listeners:', e);
+      }
+    }
+  }, []);
+
   const { mount } = useWebView<WebviewToBlockMessage, BlocksToWebviewMessage>({
     url: 'sequencer.html',
     onMessage: async (event, { postMessage }) => {
       console.log('Received message from webview:', event);
       const msg = event as WebviewToBlockMessage;
 
+      // Function to process and format data to be sent to the sequencer
+      const processAndSendData = (data: any) => {
+        console.log('Processing and sending composition data to sequencer:', data);
+        
+        try {
+          // Ensure notes is an array
+          const notes = Array.isArray(data.notes) ? data.notes : [];
+          
+          // Validate that notes have the required properties
+          const validNotes = notes.filter((note: any) => 
+            note && 
+            typeof note === 'object' && 
+            typeof note.x === 'number' && 
+            typeof note.y === 'number' && 
+            typeof note.instrument === 'string'
+          );
+          
+          if (validNotes.length !== notes.length) {
+            console.warn(`Filtered out ${notes.length - validNotes.length} invalid notes`);
+          }
+          
+          // Create a formatted payload that matches the expected format
+          const formattedData = {
+            notes: validNotes,
+            tempo: typeof data.tempo === 'number' ? data.tempo : 120
+          };
+          
+          console.log('Formatted data to send to sequencer:', formattedData);
+          
+          // Send the data in multiple formats to ensure it's received
+          
+          // Format 1: Direct message
+          postMessage(formattedData);
+          
+          // Format 2: Wrapped in type
+          postMessage({
+            type: 'load',
+            payload: formattedData
+          });
+          
+          // Format 3: Wrapped in devvit-message format
+          postMessage({
+            type: 'devvit-message',
+            data: {
+              message: {
+                type: 'load',
+                payload: formattedData
+              }
+            }
+          });
+          
+          // Format 4: Use custom event for direct DOM access
+          // This bypasses potential React re-rendering issues
+          if (postMessage) {
+            const appMessageEvent = new CustomEvent('app-message', {
+              detail: {
+                type: 'load',
+                payload: formattedData
+              }
+            });
+            
+            // Dispatch the event to the sequencer's window
+            postMessage(appMessageEvent);
+            console.log('Dispatched app-message event to sequencer');
+          }
+          
+          return true;
+        } catch (e) {
+          console.error('Error processing and sending data to sequencer:', e);
+          return false;
+        }
+      };
+
       switch (msg.type) {
         case 'INIT':
           console.log('Received INIT message, sending INIT_RESPONSE');
+          // Send response in multiple formats to ensure it's received
           postMessage({
             type: 'INIT_RESPONSE',
             payload: {
@@ -24,49 +121,120 @@ export const SequencerPost = (context: Context) => {
             },
           });
           
-          // If we have saved data, load it
-          const savedData = await compositionService.getSavedComposition(context.postId!);
-          if (savedData) {
-            console.log('Loading saved composition:', savedData);
+          // Try to load composition data
+          try {
+            console.log('Loading composition data for post:', context.postId);
             
-            // Format the data correctly for the sequencer
-            const formattedData = {
-              notes: savedData.notes,
-              tempo: savedData.tempo
-            };
+            // First try loading from new API
+            let compositionData = await compositionService.loadComposition();
             
-            console.log('Sending formatted data to sequencer:', formattedData);
-            
-            // Send in Devvit format
-            postMessage({
-              type: 'devvit-message',
-              data: {
-                message: {
-                  type: 'load',
-                  payload: formattedData
-                }
+            // If that fails, try loading from the old method (compatibility)
+            if (!compositionData) {
+              console.log('Using fallback load method');
+              const savedComposition = await compositionService.load(context.postId!);
+              
+              if (savedComposition) {
+                console.log('Loaded composition with fallback method:', savedComposition);
+                compositionData = {
+                  notes: savedComposition.notes,
+                  tempo: savedComposition.tempo
+                };
               }
-            });
-          } else {
-            console.log('No saved composition found, sending empty data');
-            // Send empty data to initialize the sequencer in Devvit format
-            postMessage({
-              type: 'devvit-message',
-              data: {
-                message: {
+            }
+            
+            if (compositionData && compositionData.notes) {
+              console.log('Sending loaded composition to sequencer:', compositionData);
+              processAndSendData(compositionData);
+            } else {
+              console.log('No saved composition found, sending empty data');
+              
+              // Send empty data to initialize the sequencer in multiple formats
+              postMessage({
+                type: 'devvit-message',
+                data: {
+                  message: {
+                    type: 'load',
+                    payload: {
+                      notes: [],
+                      tempo: 120
+                    }
+                  }
+                }
+              });
+              
+              // Also send in simpler format with a delay
+              setTimeout(() => {
+                console.log('Sending empty data in standard format as backup');
+                postMessage({
                   type: 'load',
                   payload: {
                     notes: [],
                     tempo: 120
                   }
-                }
+                });
+              }, 300);
+              
+              // Send additional format as another backup
+              setTimeout(() => {
+                console.log('Sending empty data in alternate format as another backup');
+                postMessage({
+                  type: 'load',
+                  data: {
+                    notes: [],
+                    tempo: 120
+                  }
+                });
+              }, 600);
+            }
+          } catch (e) {
+            console.error('Error loading composition:', e);
+            
+            // Send empty data as fallback
+            postMessage({
+              type: 'load',
+              payload: {
+                notes: [],
+                tempo: 120
               }
             });
           }
           break;
           
         case 'ready':
-          console.log('Sequencer is ready');
+          console.log('Sequencer is ready, resending data');
+          
+          // When we get a ready message, try sending the data again
+          try {
+            const readyCompositionData = await compositionService.loadComposition();
+            
+            if (readyCompositionData && readyCompositionData.notes) {
+              console.log('Resending data after ready message:', readyCompositionData);
+              
+              // Send in multiple formats
+              processAndSendData(readyCompositionData);
+            } else {
+              // Try fallback method
+              const fallbackComposition = await compositionService.load(context.postId!);
+              
+              if (fallbackComposition) {
+                const formattedData = {
+                  notes: fallbackComposition.notes,
+                  tempo: fallbackComposition.tempo
+                };
+                
+                console.log('Resending data after ready message (fallback):', formattedData);
+                processAndSendData(formattedData);
+              } else {
+                console.log('No data to resend after ready message');
+              }
+            }
+          } catch (e) {
+            console.error('Error resending data after ready message:', e);
+          }
+          break;
+          
+        case 'heartbeat':
+          console.log('Received heartbeat from sequencer');
           break;
           
         case 'save':
@@ -125,33 +293,30 @@ export const SequencerPost = (context: Context) => {
             console.log('Processed notes for saving:', notes);
             console.log('Processed tempo for saving:', tempo);
             
-            // Save the composition
-            const saved = await compositionService.saveComposition(
-              context.postId!,
+            // Create composition object with the extracted data
+            const composition = {
               notes,
-              tempo
-            );
+              tempo,
+              instruments: [],   // Required field by Composition interface
+              theme: 'default'   // Required field by Composition interface
+            };
+            
+            // Save the composition with the updated API
+            const saved = await compositionService.save(context.postId!, composition);
             
             if (saved) {
-              // Create a new post with the saved composition
-              const newPostId = await compositionService.createMusicPlayerPost(
-                notes,
-                tempo,
-                'My Music Composition',
-                context.postId
-              );
+              context.ui.showToast('Composition saved successfully!');
               
-              if (newPostId) {
-                context.ui.showToast('Composition saved and shared!');
-                
-                // Navigate to the new post
-                const post = await context.reddit.getPostById(newPostId);
-                if (post) {
-                  context.ui.navigateTo(post.url);
+              // Send confirmation back to the sequencer
+              postMessage({
+                type: 'devvit-message',
+                data: {
+                  message: {
+                    type: 'saveSuccess',
+                    postId: context.postId
+                  }
                 }
-              } else {
-                context.ui.showToast('Composition saved but sharing failed');
-              }
+              });
             } else {
               context.ui.showToast('Failed to save composition');
             }
@@ -161,8 +326,15 @@ export const SequencerPost = (context: Context) => {
           }
           break;
           
+        case 'notesCheck':
+        case 'notesLoaded':
+        case 'notesForceUpdated':
+        case 'testNotesAdded':
+          console.log(`Received ${msg.type} message:`, msg);
+          break;
+          
         default:
-          console.error('Unknown message type', msg);
+          console.log('Unknown message type', msg);
           break;
       }
     },
@@ -176,6 +348,7 @@ export const SequencerPost = (context: Context) => {
           <text>Create and play music right in Reddit!</text>
           <button
             onPress={() => {
+              console.log('Mounting sequencer webview');
               mount();
             }}
             appearance="primary"

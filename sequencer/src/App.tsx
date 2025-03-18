@@ -1,10 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Sequencer } from './components/Sequencer';
 import { Note } from './types';
 import './App.css';
-
-// Use test mode for local development
-const useTestMode = false;
 
 function App() {
   // State for notes and tempo
@@ -50,40 +47,86 @@ function App() {
       console.log('Test notes set:', forcedTestNotes);
     }, 2000);
 
-    // Function to find notes in a message, regardless of structure
-    const findNotesInMessage = (message: any): any => {
-      console.log('Searching for notes in message:', message);
+    // Function to recursively search for notes in an object
+    const findNotesInMessage = (obj: any): any => {
+      console.log('Looking for notes in object:', obj);
       
-      // If message is null or not an object, return null
-      if (!message || typeof message !== 'object') {
-        return null;
+      // If the object is null or undefined, return null
+      if (!obj) return null;
+      
+      // Check if this is directly the data we want
+      if (obj.notes && Array.isArray(obj.notes)) {
+        console.log('Found notes array directly in object:', obj.notes);
+        return obj;
       }
       
-      // Check if message has a notes property that is an array
-      if (message.notes && Array.isArray(message.notes)) {
-        console.log('Found notes directly in message:', message.notes);
-        return message;
+      // Check if this is a typical payload structure
+      if (obj.payload && typeof obj.payload === 'object' && obj.payload.notes && Array.isArray(obj.payload.notes)) {
+        console.log('Found notes in payload:', obj.payload.notes);
+        return obj.payload;
       }
       
-      // Check if message has a payload property with notes
-      if (message.payload && typeof message.payload === 'object') {
-        if (message.payload.notes && Array.isArray(message.payload.notes)) {
-          console.log('Found notes in message.payload:', message.payload.notes);
-          return message.payload;
-        }
-      }
-      
-      // Check if message has a data property with notes
-      if (message.data && typeof message.data === 'object') {
-        if (message.data.notes && Array.isArray(message.data.notes)) {
-          console.log('Found notes in message.data:', message.data.notes);
-          return message.data;
+      // Check if this is a Devvit message structure
+      if (obj.type === 'devvit-message' && obj.data && obj.data.message) {
+        console.log('Found Devvit message structure, checking message:', obj.data.message);
+        const message = obj.data.message;
+        
+        // Check if this is a load message with payload
+        if (message.type === 'load' && message.payload) {
+          console.log('Found load message with payload:', message.payload);
+          
+          // Check if payload has notes
+          if (message.payload.notes && Array.isArray(message.payload.notes)) {
+            console.log('Found notes in load message payload:', message.payload.notes);
+            return message.payload;
+          }
         }
         
-        // Recursively check data.message if it exists
-        if (message.data.message && typeof message.data.message === 'object') {
-          const result = findNotesInMessage(message.data.message);
+        // No notes found in the expected structure, try other properties
+        return findNotesInMessage(message);
+      }
+      
+      // Look through known properties where notes might exist
+      const possibleProps = ['data', 'message', 'payload', 'notes'];
+      for (const prop of possibleProps) {
+        if (obj[prop]) {
+          console.log(`Checking ${prop} property:`, obj[prop]);
+          
+          // If this property is an array, check if it looks like notes
+          if (Array.isArray(obj[prop])) {
+            // Check if this array contains objects that look like notes
+            if (obj[prop].length > 0 && 
+                typeof obj[prop][0] === 'object' && 
+                obj[prop][0] !== null &&
+                'x' in obj[prop][0] && 
+                'y' in obj[prop][0] && 
+                'instrument' in obj[prop][0]) {
+              console.log(`Found notes array in ${prop} property:`, obj[prop]);
+              return { notes: obj[prop], tempo: obj.tempo || 120 };
+            }
+          }
+          
+          // Recursively check this property
+          const result = findNotesInMessage(obj[prop]);
           if (result) return result;
+        }
+      }
+      
+      // Check all other properties recursively, but avoid infinite loops
+      if (typeof obj === 'object' && obj !== null) {
+        for (const key in obj) {
+          // Skip the properties we've already checked
+          if (possibleProps.includes(key)) continue;
+          
+          // Skip special properties
+          if (key === 'prototype' || key === '__proto__') continue;
+          
+          // Only proceed with object properties
+          if (typeof obj[key] === 'object' && obj[key] !== null) {
+            console.log(`Checking property ${key}:`, obj[key]);
+            const result = findNotesInMessage(obj[key]);
+            if (result) return result;
+          }
         }
       }
       
@@ -263,102 +306,166 @@ function App() {
   const handleLoadMessage = (savedData: any) => {
     console.log('handleLoadMessage called with data:', savedData);
     
-    // Handle the case where the data is directly in the format {notes: [...], tempo: number}
-    if (savedData.notes && Array.isArray(savedData.notes)) {
-      const validNotes = savedData.notes.filter((note: any) => 
-        typeof note === 'object' && 
-        note !== null && 
-        typeof note.x === 'number' && 
-        typeof note.y === 'number' && 
-        typeof note.instrument === 'string'
-      );
-      
-      console.log('Setting valid notes:', validNotes);
-      console.log('Notes before update:', notes);
-      setNotes(validNotes);
-      console.log('Notes after update function call:', notes); // This will still show old value due to closure
-      
-      // Force a re-render by setting a state flag
-      setIsLoaded(true);
-      setForceRender(prev => prev + 1);
-      
-      if (validNotes.length !== savedData.notes.length) {
-        console.warn(`Filtered out ${savedData.notes.length - validNotes.length} invalid notes`);
+    try {
+      // Handle the case where the data is directly in the format {notes: [...], tempo: number}
+      if (savedData.notes && Array.isArray(savedData.notes)) {
+        console.log('Processing notes array with length:', savedData.notes.length);
+        
+        // Deep clone notes to break references completely
+        const deepClonedNotes = JSON.parse(JSON.stringify(savedData.notes));
+        
+        const validNotes = deepClonedNotes.filter((note: any) => 
+          typeof note === 'object' && 
+          note !== null && 
+          typeof note.x === 'number' && 
+          typeof note.y === 'number' && 
+          typeof note.instrument === 'string'
+        );
+        
+        console.log('Setting valid notes:', validNotes.length, 'of', savedData.notes.length);
+        console.log('Notes before update:', notes.length, 'notes');
+        
+        // Force note rendering with multiple approaches
+        
+        // 1. Set state with fresh array copy
+        setNotes(validNotes);
+        
+        // 2. Set tempo to force a render
+        if (typeof savedData.tempo === 'number') {
+          setTempo(savedData.tempo);
+        } else {
+          // Force tempo update even if it's the same value
+          setTempo(prev => {
+            const newTempo = prev === 120 ? 121 : 120;
+            console.log(`Forcing tempo update: ${prev} -> ${newTempo}`);
+            return newTempo;
+          });
+        }
+        
+        // 3. Flag that data is loaded
+        setIsLoaded(true);
+        
+        // 4. Increment force render counter
+        setForceRender(prev => prev + 1);
+        
+        console.log('State updates complete');
+        
+        // 5. Force re-render after a short delay
+        setTimeout(() => {
+          console.log('Delayed force update - current note count:', validNotes.length);
+          // Update again to ensure rendering
+          setForceRender(prev => prev + 1);
+          
+          // Get root element for backup rendering
+          const rootElement = document.getElementById('root');
+          if (rootElement) {
+            console.log('Attempting direct DOM rendering as backup');
+            // Try to inject notes directly into DOM
+            renderNotesDirect(validNotes);
+          }
+          
+          // Send a verification message back to parent
+          try {
+            window.parent.postMessage({
+              type: 'devvit-message',
+              data: {
+                message: {
+                  type: 'notesStatus',
+                  payload: {
+                    notesReceived: validNotes.length,
+                    sequencerReady: true
+                  }
+                }
+              }
+            }, '*');
+            console.log('Sent notes status message to parent');
+          } catch (e) {
+            console.error('Error sending status message:', e);
+          }
+        }, 300);
+        
+        if (validNotes.length !== savedData.notes.length) {
+          console.warn(`Filtered out ${savedData.notes.length - validNotes.length} invalid notes`);
+        }
+      } else {
+        console.warn('No valid notes array found in saved data');
       }
-      
-      // Send a message to confirm notes were loaded
-      try {
-        window.parent.postMessage({
-          type: 'notesLoaded',
-          count: validNotes.length
-        }, '*');
-      } catch (e) {
-        console.error('Error sending notesLoaded message:', e);
-      }
-    } else if (Array.isArray(savedData)) {
-      // Try to handle the case where notes might be the entire data object
-      const validNotes = savedData.filter((note: any) => 
-        typeof note === 'object' && 
-        note !== null &&
-        typeof note.x === 'number' && 
-        typeof note.y === 'number' && 
-        typeof note.instrument === 'string'
-      );
-      
-      console.log('Detected notes array directly in data, using it:', validNotes);
-      setNotes(validNotes);
-      
-      // Force a re-render by setting a state flag
-      setIsLoaded(true);
-      setForceRender(prev => prev + 1);
-      
-      if (validNotes.length !== savedData.length) {
-        console.warn(`Filtered out ${savedData.length - validNotes.length} invalid notes`);
-      }
-      
-      // Send a message to confirm notes were loaded
-      try {
-        window.parent.postMessage({
-          type: 'notesLoaded',
-          count: validNotes.length
-        }, '*');
-      } catch (e) {
-        console.error('Error sending notesLoaded message:', e);
-      }
-    } else {
-      console.warn('Invalid notes format received:', savedData);
-      // Add test notes as fallback
-      const testNotes: Note[] = [
-        { x: 0, y: 2, instrument: 'mario' },
-        { x: 2, y: 5, instrument: 'mario' },
-        { x: 5, y: 5, instrument: 'mario' }
-      ];
-      console.log('Using fallback test notes:', testNotes);
-      setNotes(testNotes);
-      
-      // Send a message to confirm fallback notes were loaded
-      try {
-        window.parent.postMessage({
-          type: 'notesLoaded',
-          count: testNotes.length,
-          fallback: true
-        }, '*');
-      } catch (e) {
-        console.error('Error sending notesLoaded message:', e);
-      }
+    } catch (e) {
+      console.error('Error in handleLoadMessage:', e);
+    }
+  };
+
+  // Add a direct DOM rendering function as a fallback
+  const renderNotesDirect = (notesToRender: Note[]) => {
+    console.log('Direct DOM rendering notes:', notesToRender);
+    
+    // Constants that match Grid.tsx
+    const GRID_CELL_SIZE = 26;
+    
+    // Remove any existing direct renderings
+    const existingContainer = document.getElementById('direct-note-container');
+    if (existingContainer) {
+      existingContainer.remove();
     }
     
-    if (savedData.tempo && typeof savedData.tempo === 'number') {
-      console.log('Setting tempo:', savedData.tempo);
-      setTempo(savedData.tempo);
-    } else {
-      console.warn('Using default tempo (120)');
-      setTempo(120);
+    // Create container
+    const container = document.createElement('div');
+    container.id = 'direct-note-container';
+    container.style.position = 'absolute';
+    container.style.top = '0';
+    container.style.left = '0';
+    container.style.width = '100%';
+    container.style.height = '100%';
+    container.style.pointerEvents = 'none';
+    container.style.zIndex = '1000';
+    
+    // Find the sequencer container - try a few selectors
+    const sequencerContainer = 
+      document.querySelector('.sequencer') || 
+      document.querySelector('.grid-container') || 
+      document.getElementById('root');
+    
+    if (!sequencerContainer) {
+      console.error('Could not find sequencer container for direct rendering');
+      return;
     }
-
-    // Force a re-render by setting a state flag
-    setIsLoaded(true);
-    setForceRender(prev => prev + 1);
+    
+    // Find the canvas
+    const canvas = sequencerContainer.querySelector('canvas');
+    if (!canvas) {
+      console.error('Could not find canvas for direct rendering');
+      return;
+    }
+    
+    // Create notes
+    notesToRender.forEach((note) => {
+      const noteEl = document.createElement('div');
+      noteEl.style.position = 'absolute';
+      noteEl.style.left = `${note.x * GRID_CELL_SIZE + 1}px`;
+      noteEl.style.top = `${note.y * GRID_CELL_SIZE + 1}px`;
+      noteEl.style.width = `${GRID_CELL_SIZE - 2}px`;
+      noteEl.style.height = `${GRID_CELL_SIZE - 2}px`;
+      noteEl.style.backgroundColor = 'rgba(255, 0, 0, 0.7)'; // Red background for visibility
+      noteEl.style.border = '2px solid #000';
+      noteEl.style.borderRadius = '2px';
+      noteEl.style.boxShadow = '0 0 5px rgba(0, 0, 0, 0.5)';
+      noteEl.style.zIndex = '1001';
+      
+      // Add text label
+      noteEl.textContent = note.instrument.charAt(0).toUpperCase();
+      noteEl.style.display = 'flex';
+      noteEl.style.alignItems = 'center';
+      noteEl.style.justifyContent = 'center';
+      noteEl.style.color = 'white';
+      noteEl.style.fontWeight = 'bold';
+      noteEl.style.fontSize = '12px';
+      
+      container.appendChild(noteEl);
+    });
+    
+    // Add container next to canvas
+    canvas.parentNode!.appendChild(container);
+    console.log(`Added ${notesToRender.length} notes directly to DOM`);
   };
 
   return (

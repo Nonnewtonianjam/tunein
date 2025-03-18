@@ -11,12 +11,12 @@ export const MusicPlayerPost = (context: Context) => {
   const { mount } = useWebView<WebviewToBlockMessage, BlocksToWebviewMessage>({
     url: 'sequencer.html',
     onMessage: async (event, { postMessage }) => {
-      console.log('Received message from webview:', event);
+      console.log('MusicPlayerPost: Received message from webview:', event);
       const msg = event as WebviewToBlockMessage;
 
       switch (msg.type) {
         case 'INIT':
-          console.log('Received INIT message, sending INIT_RESPONSE');
+          console.log('MusicPlayerPost: Received INIT message, sending INIT_RESPONSE');
           postMessage({
             type: 'INIT_RESPONSE',
             payload: {
@@ -25,58 +25,186 @@ export const MusicPlayerPost = (context: Context) => {
           });
           
           // Load the saved composition
-          const savedData = await compositionService.getSavedComposition(context.postId!);
-          if (savedData) {
-            console.log('Loading saved composition for playback:', savedData);
+          try {
+            console.log('MusicPlayerPost: Attempting to load composition data');
             
-            // Format the data correctly for the sequencer
-            const formattedData = {
-              notes: savedData.notes,
-              tempo: savedData.tempo
-            };
+            // First try loading from new API
+            let compositionData = await compositionService.loadComposition();
             
-            console.log('Sending formatted data to sequencer:', formattedData);
+            // If that fails, try the load method as fallback
+            if (!compositionData) {
+              console.log('MusicPlayerPost: Using fallback load method');
+              const savedComposition = await compositionService.load(context.postId!);
+              
+              if (savedComposition) {
+                console.log('MusicPlayerPost: Loaded with fallback method:', savedComposition);
+                compositionData = {
+                  notes: savedComposition.notes || [],
+                  tempo: savedComposition.tempo || 120
+                };
+              }
+            }
             
-            // Send in Devvit format
-            postMessage({
-              type: 'devvit-message',
-              data: {
-                message: {
-                  type: 'load',
-                  payload: formattedData
+            if (compositionData && compositionData.notes) {
+              console.log('MusicPlayerPost: Sending loaded composition to sequencer:', compositionData);
+              
+              // Send in Devvit format
+              postMessage({
+                type: 'devvit-message',
+                data: {
+                  message: {
+                    type: 'load',
+                    payload: compositionData
+                  }
                 }
+              });
+              
+              // Also try sending in the standard format after a short delay
+              setTimeout(() => {
+                console.log('MusicPlayerPost: Sending in standard format as fallback');
+                postMessage({
+                  type: 'load',
+                  payload: compositionData
+                });
+              }, 300);
+              
+              // Try a third format as another fallback
+              setTimeout(() => {
+                console.log('MusicPlayerPost: Sending in third format as another fallback');
+                postMessage({
+                  type: 'load',
+                  data: compositionData
+                });
+              }, 600);
+              
+              // Try direct format for backup
+              setTimeout(() => {
+                console.log('MusicPlayerPost: Sending direct notes array as last resort');
+                postMessage({
+                  type: 'load',
+                  notes: compositionData.notes,
+                  tempo: compositionData.tempo
+                });
+              }, 900);
+            } else {
+              console.error('MusicPlayerPost: No saved composition found for this post');
+              
+              // Send empty data to ensure the sequencer initializes
+              postMessage({
+                type: 'devvit-message',
+                data: {
+                  message: {
+                    type: 'load',
+                    payload: {
+                      notes: [],
+                      tempo: 120
+                    }
+                  }
+                }
+              });
+            }
+          } catch (e) {
+            console.error('MusicPlayerPost: Error loading composition:', e);
+            
+            // Send empty data as fallback
+            postMessage({
+              type: 'load',
+              payload: {
+                notes: [],
+                tempo: 120
               }
             });
-            
-            // Also try sending in the standard format after a short delay
-            setTimeout(() => {
-              console.log('Sending in standard format as fallback');
-              postMessage({
-                type: 'load',
-                payload: formattedData
-              });
-            }, 500);
-          } else {
-            console.error('No saved composition found for this post');
           }
           break;
           
         case 'ready':
-          console.log('Music player is ready');
+          console.log('MusicPlayerPost: Music player is ready');
           
           // When ready message is received, try sending the data again
-          const readySavedData = await compositionService.getSavedComposition(context.postId!);
-          if (readySavedData) {
-            console.log('Resending data after ready message:', readySavedData);
+          try {
+            const readyCompositionData = await compositionService.loadComposition();
             
-            postMessage({
-              type: 'load',
-              payload: {
-                notes: readySavedData.notes,
-                tempo: readySavedData.tempo
+            if (readyCompositionData && readyCompositionData.notes) {
+              console.log('MusicPlayerPost: Resending data after ready message:', readyCompositionData);
+              
+              // Try multiple formats when resending
+              postMessage({
+                type: 'devvit-message',
+                data: {
+                  message: {
+                    type: 'load',
+                    payload: readyCompositionData
+                  }
+                }
+              });
+              
+              setTimeout(() => {
+                postMessage({
+                  type: 'load',
+                  payload: readyCompositionData
+                });
+              }, 300);
+              
+              setTimeout(() => {
+                postMessage({
+                  type: 'load',
+                  data: readyCompositionData
+                });
+              }, 600);
+            } else {
+              // Try fallback method
+              const fallbackComposition = await compositionService.load(context.postId!);
+              
+              if (fallbackComposition) {
+                const formattedData = {
+                  notes: fallbackComposition.notes || [],
+                  tempo: fallbackComposition.tempo || 120
+                };
+                
+                console.log('MusicPlayerPost: Resending data after ready message (fallback):', formattedData);
+                
+                // Try multiple formats
+                postMessage({
+                  type: 'devvit-message',
+                  data: {
+                    message: {
+                      type: 'load',
+                      payload: formattedData
+                    }
+                  }
+                });
+                
+                setTimeout(() => {
+                  postMessage({
+                    type: 'load',
+                    payload: formattedData
+                  });
+                }, 300);
+                
+                setTimeout(() => {
+                  postMessage({
+                    type: 'load',
+                    data: formattedData
+                  });
+                }, 600);
+              } else {
+                console.log('MusicPlayerPost: No data to resend after ready message');
               }
-            });
+            }
+          } catch (e) {
+            console.error('MusicPlayerPost: Error resending data after ready message:', e);
           }
+          break;
+          
+        case 'heartbeat':
+          console.log('MusicPlayerPost: Received heartbeat from sequencer');
+          break;
+          
+        case 'notesCheck':
+        case 'notesLoaded':
+        case 'notesForceUpdated':
+        case 'testNotesAdded':
+          console.log(`MusicPlayerPost: Received ${msg.type} message:`, msg);
           break;
           
         case 'save':
@@ -85,7 +213,7 @@ export const MusicPlayerPost = (context: Context) => {
           break;
           
         default:
-          console.error('Unknown message type', msg);
+          console.log('MusicPlayerPost: Unknown message type', msg);
           break;
       }
     },
@@ -99,6 +227,7 @@ export const MusicPlayerPost = (context: Context) => {
           <text>Listen to this music composition!</text>
           <button
             onPress={() => {
+              console.log('MusicPlayerPost: Mounting sequencer webview');
               mount();
             }}
             appearance="primary"

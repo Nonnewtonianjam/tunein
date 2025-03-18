@@ -1,31 +1,22 @@
-import { useState, useEffect, useCallback } from 'react';
-import { Grid } from './Grid';
-import { InstrumentPalette } from './InstrumentPalette';
-import { Note, SequencerProps, SequencerState } from '../types';
+import React, { useState, useEffect, useCallback } from 'react';
+import Grid from './Grid';
+import InstrumentPalette from './InstrumentPalette';
+import { INITIAL_STATE } from '../types';
 import { useSequencerPlayback } from '../hooks/useSequencerPlayback';
 
-const INITIAL_STATE: SequencerState = {
-  notes: [],
-  tempo: 120,
-  isPlaying: false,
-  currentBeat: 0,
-  maxBars: 64, // 16 measures of 4/4 time
-  selectedInstrument: null,
-  isShiftPressed: false,
-  isCtrlPressed: false,
-  timeSignature: { numerator: 4, denominator: 4 },
-  beatsPerMeasure: 4,
-  isLooping: false,
-  loopStart: 0,
-  loopEnd: 16,
-  _forceUpdate: 0, // Add _forceUpdate property to INITIAL_STATE
-};
-
-export function Sequencer({ onSave, initialNotes = [], initialTempo, maxBars }: SequencerProps) {
+/**
+ * @param {Object} props
+ * @param {function({notes: Array, tempo: number}): void} [props.onSave]
+ * @param {Array} [props.initialNotes]
+ * @param {number} [props.initialTempo]
+ * @param {number} [props.maxBars]
+ * @returns {JSX.Element}
+ */
+function Sequencer({ onSave, initialNotes = [], initialTempo, maxBars }) {
   console.log('Sequencer initializing with notes:', initialNotes);
   console.log('Sequencer initializing with tempo:', initialTempo);
   
-  const [state, setState] = useState<SequencerState>({
+  const [state, setState] = useState({
     ...INITIAL_STATE,
     notes: initialNotes,
     tempo: initialTempo || INITIAL_STATE.tempo,
@@ -76,13 +67,7 @@ export function Sequencer({ onSave, initialNotes = [], initialTempo, maxBars }: 
               notes: [...validNotes]
             };
           }
-          // Force a render update even if the notes are the same
-          // This is needed to ensure the component re-renders
-          return {
-            ...prev,
-            // Create a random ID to force React to detect a change
-            _forceUpdate: Date.now()
-          };
+          return prev;
         });
         
         // Send a confirmation message to the parent
@@ -116,7 +101,7 @@ export function Sequencer({ onSave, initialNotes = [], initialTempo, maxBars }: 
     }
   }, [state]);
 
-  const handleBeatChange = useCallback((beat: number) => {
+  const handleBeatChange = useCallback((beat) => {
     setState(prev => {
       // If looping is enabled and we've reached the end of the loop
       if (prev.isLooping && beat >= prev.loopEnd) {
@@ -138,7 +123,7 @@ export function Sequencer({ onSave, initialNotes = [], initialTempo, maxBars }: 
     loopEnd: state.loopEnd,
   });
 
-  const handleKeyDown = useCallback((e: KeyboardEvent) => {
+  const handleKeyDown = useCallback((e) => {
     if (e.key === 'Shift') {
       setState(prev => ({ ...prev, isShiftPressed: true }));
     } else if (e.key === 'Control') {
@@ -146,7 +131,7 @@ export function Sequencer({ onSave, initialNotes = [], initialTempo, maxBars }: 
     }
   }, []);
 
-  const handleKeyUp = useCallback((e: KeyboardEvent) => {
+  const handleKeyUp = useCallback((e) => {
     if (e.key === 'Shift') {
       setState(prev => ({ ...prev, isShiftPressed: false }));
     } else if (e.key === 'Control') {
@@ -184,7 +169,7 @@ export function Sequencer({ onSave, initialNotes = [], initialTempo, maxBars }: 
     }));
   };
 
-  const handleTempoChange = (newTempo: number) => {
+  const handleTempoChange = (newTempo) => {
     setState(prev => ({ ...prev, tempo: newTempo }));
   };
 
@@ -196,7 +181,7 @@ export function Sequencer({ onSave, initialNotes = [], initialTempo, maxBars }: 
     }));
   };
 
-  const handleLoopRangeChange = (start: number, end: number) => {
+  const handleLoopRangeChange = (start, end) => {
     setState(prev => ({ 
       ...prev, 
       loopStart: start, 
@@ -205,158 +190,152 @@ export function Sequencer({ onSave, initialNotes = [], initialTempo, maxBars }: 
     }));
   };
 
-  const handleInstrumentSelect = (instrument: string) => {
+  const handleInstrumentSelect = (instrument) => {
     setState(prev => ({ ...prev, selectedInstrument: instrument }));
   };
 
-  const handleTimeSignatureChange = (numerator: number, denominator: number) => {
-    // Calculate new maxBars based on time signature
-    const beatsPerMeasure = numerator;
-    const measuresCount = 16; // Keep constant number of measures
-    const newMaxBars = measuresCount * beatsPerMeasure;
-
-    // Adjust notes to fit new time signature
-    const adjustedNotes = state.notes.filter(note => note.x < newMaxBars);
-
-    setState(prev => ({
-      ...prev,
-      timeSignature: { numerator, denominator },
-      beatsPerMeasure,
-      maxBars: newMaxBars,
-      notes: adjustedNotes,
-      currentBeat: 0,
-      isPlaying: false,
-    }));
+  const handleAddNote = (note) => {
+    setState(prev => {
+      // Check if there's already a note at this position
+      const hasNoteAtSamePosition = prev.notes.some(n => n.x === note.x && n.y === note.y);
+      
+      // If a note already exists at this position, don't add a new one
+      if (hasNoteAtSamePosition) {
+        return prev;
+      }
+      
+      // Otherwise, add the new note
+      return { 
+        ...prev, 
+        notes: [...prev.notes, note] 
+      };
+    });
   };
 
-  const handleNoteAdd = (note: Note) => {
+  const handleRemoveNote = (x, y) => {
     setState(prev => ({
       ...prev,
-      notes: [...prev.notes.filter(n => !(n.x === note.x && n.y === note.y)), note],
-    }));
-  };
-
-  const handleNoteRemove = (x: number, y: number) => {
-    setState(prev => ({
-      ...prev,
-      notes: prev.notes.filter(note => !(note.x === x && note.y === y)),
+      notes: prev.notes.filter(note => !(note.x === x && note.y === y))
     }));
   };
 
   const handleSave = () => {
     if (onSave) {
-      console.log('Saving composition with notes and tempo:', { 
-        notes: state.notes, 
-        tempo: state.tempo 
-      });
-      onSave({ 
-        notes: state.notes, 
-        tempo: state.tempo 
-      });
+      console.log('Saving notes and tempo:', { notes: state.notes, tempo: state.tempo });
+      onSave({ notes: state.notes, tempo: state.tempo });
     }
   };
 
   return (
     <div className="sequencer">
-      <div className="controls">
-        <div className="control-group">
-          <label>Tempo: {state.tempo} BPM</label>
-          <input 
-            type="range" 
-            min="60" 
-            max="240" 
-            value={state.tempo} 
+      <div className="sequencer-header">
+        <div className="tempo-controls">
+          <label htmlFor="tempo">Tempo: {state.tempo} BPM</label>
+          <input
+            id="tempo"
+            type="range"
+            min="60"
+            max="240"
+            value={state.tempo}
             onChange={(e) => handleTempoChange(parseInt(e.target.value))}
           />
         </div>
-        <div className="control-group">
-          <button 
-            className={state.isPlaying ? 'stop' : 'play'} 
-            onClick={state.isPlaying ? handleStop : handlePlay}
-          >
-            {state.isPlaying ? 'Stop' : 'Play'}
+        
+        <div className="controls">
+          <button onClick={handlePlay} disabled={state.isPlaying}>
+            Play
           </button>
-          <button onClick={handleSave}>Save</button>
-        </div>
-        <div className="control-group instruments">
-          {Object.keys(INSTRUMENTS).map(instrument => (
-            <button
-              key={instrument}
-              className={`instrument ${state.selectedInstrument === instrument ? 'selected' : ''}`}
-              onClick={() => handleInstrumentSelect(instrument)}
+          <button onClick={handleStop} disabled={!state.isPlaying}>
+            Stop
+          </button>
+          <button onClick={handleClear}>
+            Clear
+          </button>
+          <button onClick={handleSave}>
+            Save
+          </button>
+          <div className="loop-controls">
+            <button 
+              onClick={handleLoopToggle}
+              className={state.isLooping ? 'active' : ''}
             >
-              {instrument}
+              Loop: {state.isLooping ? 'On' : 'Off'}
             </button>
-          ))}
+            {state.isLooping && (
+              <div className="loop-range">
+                <label>
+                  Start:
+                  <input
+                    type="number"
+                    min="0"
+                    max={state.loopEnd - 1}
+                    value={state.loopStart}
+                    onChange={(e) => handleLoopRangeChange(parseInt(e.target.value), state.loopEnd)}
+                  />
+                </label>
+                <label>
+                  End:
+                  <input
+                    type="number"
+                    min={state.loopStart + 1}
+                    max={state.maxBars}
+                    value={state.loopEnd}
+                    onChange={(e) => handleLoopRangeChange(state.loopStart, parseInt(e.target.value))}
+                  />
+                </label>
+              </div>
+            )}
+          </div>
         </div>
       </div>
       
-      <Grid 
-        notes={state.notes} 
-        maxBars={state.maxBars}
-        currentBeat={state.currentBeat}
+      <div className="grid-container">
+        <Grid
+          notes={state.notes}
+          currentBeat={state.currentBeat}
+          maxBars={state.maxBars}
+          selectedInstrument={state.selectedInstrument}
+          isShiftPressed={state.isShiftPressed}
+          isCtrlPressed={state.isCtrlPressed}
+          onAddNote={handleAddNote}
+          onRemoveNote={handleRemoveNote}
+          isLooping={state.isLooping}
+          loopStart={state.loopStart}
+          loopEnd={state.loopEnd}
+        />
+      </div>
+      
+      <InstrumentPalette
         selectedInstrument={state.selectedInstrument}
-        onNoteAdd={handleNoteAdd}
-        onNoteRemove={handleNoteRemove}
-        beatsPerMeasure={state.beatsPerMeasure}
+        onSelect={handleInstrumentSelect}
       />
       
-      {/* Direct DOM-based rendering of notes as a backup */}
-      <div style={{ 
-        position: 'relative', 
-        width: '780px',
-        height: '300px',
-        marginTop: '10px',
-        background: '#f5f5f5',
-        border: '1px solid #ccc',
-        display: state.notes.length > 0 ? 'block' : 'none' // Show when notes exist
-      }}>
-        {state.notes.map((note, index) => (
-          <div 
-            key={`direct-note-${index}`}
-            style={{
-              position: 'absolute',
-              left: `${note.x * 30 + 1}px`,
-              top: `${note.y * 30 + 1}px`,
-              width: '28px',
-              height: '28px',
-              backgroundColor: 'rgba(255, 0, 0, 0.7)', // Red for visibility
-              border: '2px solid #4a90e2',
-              borderRadius: '2px'
-            }}
-          />
-        ))}
+      {/* Debug info */}
+      <div className="debug-info" style={{ margin: '10px 0', fontSize: '12px', fontFamily: 'monospace' }}>
+        <div>Notes: {state.notes.length}</div>
+        <div>Current Beat: {state.currentBeat}</div>
+        <div>Selected Instrument: {state.selectedInstrument || 'None'}</div>
       </div>
       
-      {/* Debug display for notes */}
-      <div style={{ 
-        marginTop: '10px', 
-        padding: '10px', 
-        background: '#f0f0f0', 
-        border: '1px solid #ccc',
-        borderRadius: '4px',
-        fontSize: '12px',
-        display: 'block' // Always visible for debugging
-      }}>
-        <div>Notes count: {state.notes.length}</div>
-        <div>Current beat: {state.currentBeat}</div>
-        <div>Last updated: {new Date().toLocaleTimeString()}</div>
-        <button onClick={() => {
-          console.log('Current notes in state:', state.notes);
-          if (initialNotes && Array.isArray(initialNotes)) {
-            console.log('Initial notes:', initialNotes);
-            setState(prev => ({
-              ...prev,
-              notes: [...initialNotes]
-            }));
-          }
+      {/* Display notes backup */}
+      <div style={{ margin: '20px 0' }}>
+        <h3>Notes in state:</h3>
+        <div style={{
+          border: '1px solid #ccc',
+          padding: '10px',
+          background: '#f7f7f7',
+          maxHeight: '200px',
+          overflow: 'auto'
         }}>
-          Force Update Notes
-        </button>
-        <pre style={{ maxHeight: '100px', overflow: 'auto' }}>
-          {JSON.stringify(state.notes, null, 2)}
-        </pre>
+          {state.notes.length > 0 ? (
+            <pre>{JSON.stringify(state.notes, null, 2)}</pre>
+          ) : (
+            <p>No notes</p>
+          )}
+        </div>
       </div>
     </div>
   );
 }
+
+export default Sequencer;

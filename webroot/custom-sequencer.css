@@ -10,6 +10,13 @@
   gap: 0.5rem !important;
   padding: 0.5rem !important;
   max-width: 100% !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  background-color: #ffffff !important;
+  border-radius: 8px !important;
+  box-shadow: 0 0 20px rgba(0,0,0,0.1) !important;
+  position: relative !important;
+  z-index: 10 !important;
 }
 
 /* Adjust the sequencer header */
@@ -18,6 +25,11 @@
   margin-bottom: 0.5rem !important;
   gap: 0.5rem !important;
   overflow: visible !important; /* Prevent scrollbars */
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  width: 100% !important;
+  flex-wrap: wrap !important;
 }
 
 /* Make the grid container expand to fill available space */
@@ -29,6 +41,13 @@
   flex-direction: column !important;
   overflow-x: auto !important;
   max-width: 100% !important;
+  min-height: 200px !important;
+  border: 1px solid #ccc !important;
+  border-radius: 4px !important;
+  background-color: #f9f9f9 !important;
+  padding: 5px !important;
+  visibility: visible !important;
+  opacity: 1 !important;
 }
 
 /* Make the grid expand to fill available space */
@@ -37,6 +56,39 @@
   width: 100% !important;
   overflow: auto !important;
   gap: 1px !important;
+  display: grid !important;
+  grid-template-columns: repeat(auto-fill, minmax(25px, 1fr)) !important;
+  grid-auto-rows: 25px !important;
+  align-items: stretch !important;
+  justify-items: stretch !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+}
+
+/* Make grid cells more visible */
+.grid-cell {
+  width: 25px !important;
+  height: 25px !important;
+  border: 1px solid #ddd !important;
+  background-color: #ffffff !important;
+  transition: background-color 0.2s !important;
+  cursor: pointer !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+}
+
+/* Highlight grid cells */
+.grid-cell:hover {
+  background-color: #e6f7ff !important;
+  border-color: #1890ff !important;
+}
+
+.grid-cell.active {
+  background-color: #91d5ff !important;
+  border-color: #1890ff !important;
 }
 
 /* Ensure controls stay at the bottom */
@@ -45,11 +97,31 @@
   margin-top: 0.5rem !important;
   padding: 0.5rem !important;
   gap: 0.5rem !important;
+  display: flex !important;
+  flex-wrap: wrap !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  background-color: #f0f0f0 !important;
+  border-radius: 4px !important;
+  visibility: visible !important;
+  opacity: 1 !important;
 }
 
 /* Reduce padding in the root element */
 #root {
   padding: 0.25rem !important;
+  width: 100% !important;
+  height: 100% !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  position: absolute !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
 }
 
 /* Ensure the app container fills the space */
@@ -60,65 +132,138 @@
   display: flex !important;
   align-items: stretch !important;
   justify-content: center !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  position: absolute !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
 }
 
-/* Make buttons more compact */
-.button {
+/* Make buttons more compact but visible */
+button {
   padding: 0.25rem 0.5rem !important;
   font-size: 12px !important;
+  background-color: #1890ff !important;
+  color: white !important;
+  border: none !important;
+  border-radius: 4px !important;
+  cursor: pointer !important;
+  margin: 3px !important;
+  box-shadow: 0 2px 0 rgba(0,0,0,0.1) !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+}
+
+button:hover {
+  background-color: #40a9ff !important;
+}
+
+button:active {
+  background-color: #096dd9 !important;
+  transform: translateY(1px) !important;
 }
 
 /* Adjust font sizes */
 h1, h2, h3 {
   font-size: 1.2em !important;
   margin: 0.25rem 0 !important;
+  color: #333 !important;
+  font-weight: bold !important;
+  visibility: visible !important;
+  opacity: 1 !important;
 }
 
-/* Make the tempo display smaller */
+/* Make the tempo display more visible */
 .tempo-display {
-  font-size: 12px !important;
+  font-size: 14px !important;
+  font-weight: bold !important;
+  color: #333 !important;
+  background-color: #f9f9f9 !important;
+  padding: 5px 10px !important;
+  border-radius: 4px !important;
+  border: 1px solid #ddd !important;
+  visibility: visible !important;
+  opacity: 1 !important;
 }
 
-/* Reduce the size of the grid cells */
-.grid-cell {
-  width: 25px !important;
-  height: 25px !important;
-}
-
-/* Make instrument buttons smaller */
+/* Make instrument buttons more visible */
 .instrument-button {
-  width: 30px !important;
-  height: 30px !important;
-  padding: 2px !important;
+  width: 40px !important;
+  height: 40px !important;
+  padding: 5px !important;
+  background-color: #f0f0f0 !important;
+  border: 1px solid #ddd !important;
+  border-radius: 4px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  cursor: pointer !important;
+  transition: all 0.2s !important;
+  font-size: 16px !important;
+  visibility: visible !important;
+  opacity: 1 !important;
 }
 
-/* Make the instrument palette more compact */
+.instrument-button:hover {
+  background-color: #e6f7ff !important;
+  border-color: #1890ff !important;
+}
+
+.instrument-button.active {
+  background-color: #91d5ff !important;
+  border-color: #1890ff !important;
+}
+
+/* Make the instrument palette more visible */
 .instrument-palette {
-  padding: 0.25rem !important;
-  gap: 0.25rem !important;
+  padding: 0.5rem !important;
+  gap: 0.5rem !important;
   overflow: visible !important; /* Remove scrollbar */
   flex-wrap: wrap !important; /* Allow wrapping to prevent overflow */
   justify-content: center !important; /* Center the buttons */
-  max-width: 100% !important;
-  overflow-x: hidden !important; /* Explicitly hide horizontal scrollbar */
+  display: flex !important;
+  background-color: #f9f9f9 !important;
+  border: 1px solid #ddd !important;
+  border-radius: 4px !important;
+  margin-bottom: 10px !important;
+  visibility: visible !important;
+  opacity: 1 !important;
 }
 
-/* Make the preview window smaller */
-.preview-window {
-  min-height: 40px !important;
-  padding: 0.25rem !important;
+/* Add styles for the debug panel */
+.debug-panel {
+  position: fixed !important;
+  bottom: 0 !important;
+  right: 0 !important;
+  width: 250px !important;
+  max-height: 250px !important;
+  background-color: rgba(0, 0, 0, 0.8) !important;
+  color: white !important;
+  padding: 10px !important;
+  border-radius: 5px 0 0 0 !important;
+  z-index: 1000 !important;
+  overflow-y: auto !important;
+  font-size: 11px !important;
+  font-family: monospace !important;
+  visibility: visible !important;
+  opacity: 1 !important;
 }
 
-/* Remove all scrollbars from header elements */
-.sequencer-header > * {
-  overflow: visible !important;
-  overflow-x: hidden !important;
-  max-width: 100% !important;
+/* Style all children for maximum visibility */
+* {
+  visibility: visible !important;
+  opacity: 1 !important;
 }
 
-/* Target specific elements that might have scrollbars */
-.selected-instrument, .instrument-label, .instrument-preview {
-  overflow: hidden !important;
-  white-space: nowrap !important;
-  text-overflow: ellipsis !important;
+/* Force note visibility */
+[data-is-note="true"] {
+  background-color: #ff9900 !important;
+  border: 2px solid #ff6600 !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  z-index: 100 !important;
+  position: relative !important;
+  box-shadow: 0 0 10px rgba(255, 153, 0, 0.7) !important;
 }

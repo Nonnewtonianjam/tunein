@@ -39,6 +39,7 @@ export interface SequencerState {
   isLooping: boolean;
   loopStart: number;
   loopEnd: number;
+  _forceUpdate?: number; // Add this to force re-renders
 }
 
 export interface SequencerProps {
